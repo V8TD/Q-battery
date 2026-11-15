@@ -74,10 +74,10 @@ final class ColorPicker {
         box.setPadding(dp(a, 20), dp(a, 12), dp(a, 20), dp(a, 8));
 
         TextView preview = new TextView(a);
-        preview.setText("88");
+        preview.setText(title);
         preview.setGravity(Gravity.CENTER);
-        preview.setTextSize(32);
-        preview.setPadding(0, dp(a, 14), 0, dp(a, 14));
+        preview.setTextSize(20);
+        preview.setPadding(0, dp(a, 18), 0, dp(a, 18));
         box.addView(preview, new LinearLayout.LayoutParams(-1, -2));
 
         SeekBar hue = new SeekBar(a);
@@ -187,8 +187,8 @@ final class ColorPicker {
         ScrollView scroll = new ScrollView(a);
         scroll.addView(box);
 
-        new AlertDialog.Builder(a)
-                .setTitle(title)
+                new AlertDialog.Builder(a)
+                .setTitle("Цвет диапазона")
                 .setView(scroll)
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Сохранить", (d, w) -> callback.onColor(Color.HSVToColor(new float[]{
