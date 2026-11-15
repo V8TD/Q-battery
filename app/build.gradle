@@ -2,6 +2,8 @@ plugins {
     id 'com.android.application'
 }
 
+def testKeyStore = rootProject.file("signing/test-key.p12")
+
 android {
     namespace 'com.v8td.batterywidget'
     compileSdk 35
@@ -11,20 +13,32 @@ android {
         applicationId "com.v8td.batterywidget"
         minSdk 28
         targetSdk 35
-        versionCode 3
-        versionName "0.3"
+        versionCode 4
+        versionName "0.4"
     }
 
     buildFeatures {
         buildConfig true
     }
 
+    signingConfigs {
+        testKey {
+            storeFile testKeyStore
+            storeType "PKCS12"
+            storePassword "qbattery"
+            keyAlias "qbattery"
+            keyPassword "qbattery"
+        }
+    }
+
     buildTypes {
         debug {
             minifyEnabled false
+            if (testKeyStore.exists()) signingConfig signingConfigs.testKey
         }
         release {
             minifyEnabled false
+            if (testKeyStore.exists()) signingConfig signingConfigs.testKey
         }
     }
 
