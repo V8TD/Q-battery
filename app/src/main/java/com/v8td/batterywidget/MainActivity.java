@@ -58,7 +58,8 @@ public final class MainActivity extends Activity {
             App.exec(() -> WidgetUpdater.refresh(this, true));
             App.watch(this);
         }
-        refreshUi();
+                refreshUi();
+        FirstRun.showIfNeeded(this);
     }
 
     private void applyInsets() {
