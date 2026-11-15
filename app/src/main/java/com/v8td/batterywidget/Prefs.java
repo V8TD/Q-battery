@@ -14,7 +14,7 @@ final class Prefs {
     static final int CHARGING_COLOR = 0xFF35D9FF;
 
     static final String[] PALETTE_NAMES = {
-            "Standard", "Neon", "Pastel", "Pearlescent", "Metallic", "Пользовательская"
+            "Стандарт", "Неон", "Пастель", "Карамель", "Пользовательская"
     };
 
     /** Порядок: от 91–100% вниз до 0–10%. */
@@ -25,10 +25,8 @@ final class Prefs {
              0xFFFFC400, 0xFFFF9100, 0xFFFF3D00, 0xFFFF1744, 0xFFD500F9},
             {0xFFA5D6A7, 0xFFB9E0A5, 0xFFD7E8A8, 0xFFF3E9A9, 0xFFFFE0B2,
              0xFFFFCCBC, 0xFFFFAB91, 0xFFEF9A9A, 0xFFE5989B, 0xFFCE93D8},
-            {0xFF9FE8C8, 0xFF9FE0E8, 0xFFA8D2F0, 0xFFB9C6F2, 0xFFCDBBEF,
-             0xFFE3B7E4, 0xFFF0B9CE, 0xFFF2C3B4, 0xFFEED9AE, 0xFFCFE6B4},
-            {0xFFB8C6C2, 0xFFA9B7B0, 0xFFC0B49A, 0xFFD4AF7A, 0xFFCD9B62,
-             0xFFB98A5E, 0xFFA87C63, 0xFF9E6B63, 0xFF8E6A72, 0xFF7E6A80}
+            {0xFF00806A, 0xFF1B8A3A, 0xFF4C8C1E, 0xFF7D8A0A, 0xFF9A7B00,
+             0xFFB26A00, 0xFFC05500, 0xFFC62828, 0xFFA01020, 0xFF7A0A18}
     };
 
     static final String[] BAND_NAMES = {
@@ -107,10 +105,6 @@ final class Prefs {
         bump();
     }
 
-    static void resetBandToDefault(Context c, int band) {
-        setUserColor(c, band, PALETTES[0][Math.max(0, Math.min(BANDS - 1, band))]);
-    }
-
     static boolean soundEnabled(Context c) {
         return get(c).getBoolean("sound_enabled", true);
     }
@@ -180,7 +174,6 @@ final class Prefs {
         }
     }
 
-    // Запись только при реальном изменении — лишний раз память не тревожим.
     private static void putInt(SharedPreferences p, String key, int value) {
         if (p.getInt(key, Integer.MIN_VALUE) == value) return;
         p.edit().putInt(key, value).apply();
