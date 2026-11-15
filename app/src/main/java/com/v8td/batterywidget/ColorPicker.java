@@ -2,18 +2,27 @@ package com.v8td.batterywidget;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
-/** Редактор цвета: оттенок/насыщенность/яркость + 7 групп × 5 стилей × 15 оттенков. */
+/** Редактор цвета: ползунки, HEX и таблица 7 групп × 4 стиля × 15 оттенков. */
 final class ColorPicker {
 
     interface Callback {
@@ -23,10 +32,37 @@ final class ColorPicker {
     private static final String[] GROUP_NAMES =
             {"Красный", "Оранжевый", "Жёлтый", "Зелёный", "Бирюзовый", "Синий", "Фиолетовый"};
     private static final int[] GROUP_HUES = {0, 28, 55, 120, 178, 220, 278};
-    private static final String[] STYLE_NAMES =
-            {"Standard", "Neon", "Pastel", "Pearlescent", "Metallic"};
+    private static final String[] STYLE_NAMES = {"Стандарт", "Неон", "Пастель", "Карамель"};
 
     private ColorPicker() {
+    }
+
+    static int contrast(int color) {
+        int luma = (Color.red(color) * 299 + Color.green(color) * 587 + Color.blue(color) * 114) / 1000;
+        return luma > 145 ? 0xFF10161F : 0xFFFFFFFF;
+    }
+
+    static String toHex(int color) {
+        return String.format("#%06X", 0xFFFFFF & color);
+    }
+
+    static Integer parseHex(String raw) {
+        if (raw == null) return null;
+        String s = raw.trim();
+        if (s.startsWith("#")) s = s.substring(1);
+        if (s.length() == 3) {
+            StringBuilder b = new StringBuilder();
+            for (int i = 0; i < 3; i++) {
+                b.append(s.charAt(i)).append(s.charAt(i));
+            }
+            s = b.toString();
+        }
+        if (s.length() != 6) return null;
+        try {
+            return (int) (0xFF000000L | Long.parseLong(s, 16));
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     static void open(Activity a, String title, int initial, Callback callback) {
@@ -38,9 +74,9 @@ final class ColorPicker {
         box.setPadding(dp(a, 20), dp(a, 12), dp(a, 20), dp(a, 8));
 
         TextView preview = new TextView(a);
-        preview.setText("  88  ");
+        preview.setText("88");
         preview.setGravity(Gravity.CENTER);
-        preview.setTextSize(30);
+        preview.setTextSize(32);
         preview.setPadding(0, dp(a, 14), 0, dp(a, 14));
         box.addView(preview, new LinearLayout.LayoutParams(-1, -2));
 
@@ -54,6 +90,18 @@ final class ColorPicker {
         val.setMax(100);
         val.setProgress(Math.round(hsv[2] * 100));
 
+        final boolean[] lockHex = {false};
+
+        EditText hex = new EditText(a);
+        hex.setSingleLine(true);
+        hex.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        hex.setFilters(new InputFilter[]{new InputFilter.LengthFilter(7)});
+        hex.setTextSize(15);
+        hex.setTextColor(a.getColor(R.color.text));
+        hex.setHintTextColor(a.getColor(R.color.muted));
+        hex.setHint("#35D9FF");
+        hex.setText(toHex(initial));
+
         Runnable paint = () -> {
             int color = Color.HSVToColor(new float[]{
                     hue.getProgress(), sat.getProgress() / 100f, val.getProgress() / 100f});
@@ -61,8 +109,13 @@ final class ColorPicker {
             bg.setColor(color);
             bg.setCornerRadius(dp(a, 10));
             preview.setBackground(bg);
-            int luma = (Color.red(color) * 299 + Color.green(color) * 587 + Color.blue(color) * 114) / 1000;
-            preview.setTextColor(luma > 145 ? 0xFF10161F : 0xFFFFFFFF);
+            preview.setTextColor(contrast(color));
+            if (!lockHex[0]) {
+                lockHex[0] = true;
+                hex.setText(toHex(color));
+                hex.setSelection(hex.getText().length());
+                lockHex[0] = false;
+            }
         };
 
         addSlider(a, box, "Оттенок", hue);
@@ -78,12 +131,55 @@ final class ColorPicker {
         sat.setOnSeekBarChangeListener(listener);
         val.setOnSeekBarChangeListener(listener);
 
+        hex.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int st, int c, int af) { }
+            @Override public void onTextChanged(CharSequence s, int st, int b, int c) { }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (lockHex[0]) return;
+                Integer parsed = parseHex(s.toString());
+                if (parsed == null) return;
+                float[] h = new float[3];
+                Color.colorToHSV(parsed, h);
+                lockHex[0] = true;
+                hue.setProgress(Math.round(h[0]));
+                sat.setProgress(Math.round(h[1] * 100f));
+                val.setProgress(Math.round(h[2] * 100f));
+                paint.run();
+                lockHex[0] = false;
+            }
+        });
+
+        box.addView(label(a, "Код цвета (HEX)"));
+
+        LinearLayout hexRow = new LinearLayout(a);
+        hexRow.setOrientation(LinearLayout.HORIZONTAL);
+        hexRow.setGravity(Gravity.CENTER_VERTICAL);
+        hexRow.addView(hex, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        Button copy = new Button(a);
+        copy.setText("Копировать");
+        copy.setAllCaps(false);
+        copy.setTextSize(12);
+        copy.setTextColor(a.getColor(R.color.text));
+        copy.setOnClickListener(view -> {
+            ClipboardManager cm = (ClipboardManager) a.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) {
+                cm.setPrimaryClip(ClipData.newPlainText("color", hex.getText().toString()));
+                Toast.makeText(a, "Скопировано", Toast.LENGTH_SHORT).show();
+            }
+        });
+        hexRow.addView(copy, new LinearLayout.LayoutParams(-2, -2));
+        box.addView(hexRow, new LinearLayout.LayoutParams(-1, -2));
+
         Button presets = new Button(a);
-        presets.setText("Готовые цвета: 7 групп × 5 стилей × 15 оттенков");
+        presets.setText("Готовые цвета");
         presets.setAllCaps(false);
+        presets.setTextColor(a.getColor(R.color.text));
         presets.setOnClickListener(view -> showPresets(a, hue, sat, val, paint));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.topMargin = dp(a, 12);
+        lp.topMargin = dp(a, 14);
         box.addView(presets, lp);
 
         paint.run();
@@ -116,7 +212,7 @@ final class ColorPicker {
         content.addView(label(a, "Стиль"));
         LinearLayout styles = new LinearLayout(a);
         styles.setOrientation(LinearLayout.HORIZONTAL);
-        content.addView(styles, new LinearLayout.LayoutParams(-1, dp(a, 40)));
+        content.addView(styles, new LinearLayout.LayoutParams(-1, dp(a, 42)));
 
         content.addView(label(a, "Оттенки: сверху тёмные, снизу светлые"));
         GridLayout shades = new GridLayout(a);
@@ -144,7 +240,7 @@ final class ColorPicker {
                 shape.setColor(Color.HSVToColor(new float[]{GROUP_HUES[i], 0.88f, 0.92f}));
                 shape.setCornerRadius(dp(a, 6));
                 shape.setStroke(dp(a, i == group[0] ? 3 : 1),
-                        i == group[0] ? 0xFF35D9FF : 0x66889099);
+                        i == group[0] ? a.getColor(R.color.accent) : 0x66889099);
                 chip.setBackground(shape);
                 chip.setContentDescription(GROUP_NAMES[i]);
                 GridLayout.LayoutParams glp = new GridLayout.LayoutParams();
@@ -168,18 +264,19 @@ final class ColorPicker {
                 Button b = new Button(a);
                 b.setText(STYLE_NAMES[i]);
                 b.setAllCaps(false);
-                b.setTextSize(9);
+                b.setTextSize(11);
                 b.setMinWidth(0);
                 b.setMinimumWidth(0);
                 b.setPadding(0, 0, 0, 0);
-                b.setTextColor(0xFFE8EEF7);
+                b.setTextColor(a.getColor(R.color.text));
                 GradientDrawable bg = new GradientDrawable();
                 bg.setCornerRadius(dp(a, 8));
-                bg.setColor(i == style[0] ? 0xFF1D3D4D : 0xFF1B2330);
-                bg.setStroke(dp(a, 1), i == style[0] ? 0xFF35D9FF : 0xFF2A3547);
+                bg.setColor(a.getColor(R.color.button));
+                bg.setStroke(dp(a, i == style[0] ? 2 : 1),
+                        i == style[0] ? a.getColor(R.color.accent) : a.getColor(R.color.stroke));
                 b.setBackground(bg);
-                LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(0, dp(a, 34), 1f);
-                blp.setMargins(dp(a, 1), dp(a, 2), dp(a, 1), dp(a, 2));
+                LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(0, dp(a, 36), 1f);
+                blp.setMargins(dp(a, 2), dp(a, 2), dp(a, 2), dp(a, 2));
                 styles.addView(b, blp);
                 b.setOnClickListener(view -> {
                     style[0] = index;
@@ -206,13 +303,8 @@ final class ColorPicker {
                             brightness = 0.58f + 0.42f * row / 14f;
                             break;
                         case 3:
-                            saturation = 0.12f + col * 0.065f;
-                            brightness = 0.48f + 0.52f * row / 14f;
-                            hueDeg = (hueDeg + (col - 3) * 1.7f + 360f) % 360f;
-                            break;
-                        case 4:
-                            saturation = 0.08f + col * 0.075f;
-                            brightness = 0.18f + 0.82f * row / 14f;
+                            saturation = 0.72f + col * 0.04f;
+                            brightness = 0.26f + 0.46f * row / 14f;
                             break;
                         default:
                             saturation = 0.30f + col * 0.115f;
@@ -258,7 +350,7 @@ final class ColorPicker {
         TextView t = new TextView(a);
         t.setText(text);
         t.setTextSize(13);
-        t.setTextColor(0xFF93A3B8);
+        t.setTextColor(a.getColor(R.color.muted));
         t.setPadding(0, dp(a, 8), 0, dp(a, 4));
         return t;
     }
