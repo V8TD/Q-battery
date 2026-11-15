@@ -186,6 +186,7 @@ public final class MainActivity extends Activity {
         status.setText(sb.toString());
 
         refreshSoundName();
+        refreshBackgroundStates();
     }
 
     private void refreshSoundName() {
@@ -395,7 +396,31 @@ public final class MainActivity extends Activity {
         if (!configuring) refreshUi();
     }
 
+       private void refreshBackgroundStates() {
+        boolean free = FirstRun.batteryUnrestricted(this);
+
+        Button battery = findViewById(R.id.btn_battery);
+        battery.setText(twoLine("Экономия заряда и фоновая работа",
+                free ? "Без ограничений ✓" : "Ограничена ✗",
+                free ? 0xFF3FBF7F : 0xFFE0A030));
+
+        Button autostart = findViewById(R.id.btn_autostart);
+        autostart.setText(twoLine("Автозапуск (Xiaomi / HyperOS)",
+                "Состояние неизвестно — проверьте вручную", 0xFF93A3B8));
+    }
+
+    private CharSequence twoLine(String title, String state, int stateColor) {
+        android.text.SpannableStringBuilder s = new android.text.SpannableStringBuilder(title);
+        s.append("\n");
+        int start = s.length();
+        s.append(state);
+        s.setSpan(new android.text.style.RelativeSizeSpan(0.8f), start, s.length(),
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        s.setSpan(new android.text.style.ForegroundColorSpan(stateColor), start, s.length(),
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return s;
+    }
+
     private int dp(float value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
-}
