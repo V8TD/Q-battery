@@ -58,7 +58,7 @@ public final class MainActivity extends Activity {
             App.exec(() -> WidgetUpdater.refresh(this, true));
             App.watch(this);
         }
-                refreshUi();
+        refreshUi();
         FirstRun.showIfNeeded(this);
     }
 
@@ -122,8 +122,14 @@ public final class MainActivity extends Activity {
                 tvThreshold.setText("Порог сигнала: " + (progress + 50) + "%");
                 if (fromUser) Prefs.setThreshold(MainActivity.this, progress + 50);
             }
-            @Override public void onStartTrackingTouch(SeekBar s) { }
-            @Override public void onStopTrackingTouch(SeekBar s) { }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar s) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar s) {
+            }
         });
 
         Button pick = findViewById(R.id.btn_sound_pick);
@@ -181,7 +187,7 @@ public final class MainActivity extends Activity {
         sb.append(s.valid ? s.percent + "%" : "данные недоступны");
         sb.append(s.charging ? " · зарядка подключена" : " · от батареи");
         sb.append("\nСхема: ").append(Prefs.PALETTE_NAMES[Prefs.palette(this)]);
-        sb.append("\nОбновление: по событиям системы + проверка раз в 15 минут");
+        sb.append("\nОбновление: по событиям системы, при включении экрана и раз в 15 минут");
         sb.append("\nОптимизация батареи: ").append(free ? "без ограничений" : "ограничена");
         status.setText(sb.toString());
 
@@ -351,9 +357,10 @@ public final class MainActivity extends Activity {
     private void showHelp() {
         new AlertDialog.Builder(this)
                 .setTitle("Если виджет отстаёт")
-                .setMessage("Обновление идёт по системным событиям, плюс резервная проверка раз в 15 минут. "
-                        + "Постоянной службы и уведомления нет — это экономит заряд.\n\n"
-                        + "На Xiaomi (MIUI / HyperOS) дополнительно разрешите:\n"
+                .setMessage("Виджет обновляется по сообщениям системы и сразу при включении экрана. "
+                        + "При включённом экране есть страховка раз в 30 секунд, "
+                        + "при выключенном — проверок нет вовсе.\n\n"
+                        + "На Xiaomi (MIUI / HyperOS) разрешите:\n"
                         + "• Автозапуск приложения;\n"
                         + "• Экономию заряда — «Без ограничений»;\n"
                         + "• Фоновую активность, если такой пункт есть.\n\n"
@@ -393,10 +400,13 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        App.watch(this);
+        Scheduler.ensure(this);
+        App.exec(() -> WidgetUpdater.refresh(this, true));
         if (!configuring) refreshUi();
     }
 
-       private void refreshBackgroundStates() {
+    private void refreshBackgroundStates() {
         boolean free = FirstRun.batteryUnrestricted(this);
 
         Button battery = findViewById(R.id.btn_battery);
@@ -424,3 +434,4 @@ public final class MainActivity extends Activity {
     private int dp(float value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
+}
