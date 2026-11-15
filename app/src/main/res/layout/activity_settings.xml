@@ -88,8 +88,29 @@
 
             <TextView style="@style/Section" android:text="Цвет цифр" />
 
-            <Button android:id="@+id/btn_palette" style="@style/Btn"
-                android:text="Цветовая схема" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_palette"
+                    style="@style/Btn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="Схема" />
+
+                <Button
+                    android:id="@+id/btn_bands"
+                    style="@style/Btn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center"
+                    android:text="Свои цвета" />
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/palette_preview"
@@ -98,10 +119,7 @@
                 android:layout_marginTop="10dp"
                 android:orientation="horizontal" />
 
-            <Button android:id="@+id/btn_bands" style="@style/Btn"
-                android:text="Настроить цвета диапазонов" />
-
-            <TextView style="@style/Section" android:text="Сигнал при зарядке" />
+            <TextView style="@style/Section" android:text="Сигнал о зарядке" />
 
             <Switch
                 android:id="@+id/sw_sound"
@@ -109,7 +127,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:minHeight="44dp"
-                android:text="Сигнал при достижении порога"
+                android:text="Подать сигнал при зарядке"
                 android:textColor="@color/text"
                 android:textSize="15sp" />
 
@@ -117,7 +135,7 @@
                 android:id="@+id/tv_threshold"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:textColor="@color/muted"
                 android:textSize="14sp" />
 
@@ -127,27 +145,40 @@
                 android:layout_height="wrap_content"
                 android:max="50" />
 
-            <TextView
-                android:id="@+id/tv_sound_name"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textColor="@color/muted"
-                android:textSize="13sp" />
+                android:layout_marginTop="8dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
 
-            <Button android:id="@+id/btn_sound_pick" style="@style/Btn"
-                android:text="Выбрать системный звук" />
+                <Button
+                    android:id="@+id/btn_sound_pick"
+                    style="@style/Btn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginTop="0dp"
+                    android:text="Выбор сигнала" />
 
-            <Button android:id="@+id/btn_sound_test" style="@style/Btn"
-                android:text="Проверить сигнал" />
+                <ImageButton
+                    android:id="@+id/btn_sound_test"
+                    android:layout_width="56dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_button"
+                    android:contentDescription="Проверить сигнал"
+                    android:padding="14dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_speaker" />
+            </LinearLayout>
 
             <TextView style="@style/Section" android:text="Работа в фоне" />
 
             <Button android:id="@+id/btn_autostart" style="@style/Btn"
-                android:text="Автозапуск (Xiaomi / HyperOS)" />
+                android:text="Автозапуск" />
 
             <Button android:id="@+id/btn_battery" style="@style/Btn"
-                android:text="Экономия заряда и фоновая работа" />
+                android:text="Экономия заряда" />
 
             <Button android:id="@+id/btn_appinfo" style="@style/Btn"
                 android:text="Системные настройки приложения" />
