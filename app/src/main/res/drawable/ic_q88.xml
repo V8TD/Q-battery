@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Кольцо Q -->
+    <path
+        android:pathData="M24,54 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0"
+        android:strokeColor="#35D9FF"
+        android:strokeWidth="7"
+        android:fillColor="#00000000" />
+
+    <!-- Хвост Q -->
+    <path
+        android:pathData="M68,68 L77,77"
+        android:strokeColor="#35D9FF"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Левая восьмёрка -->
+    <path
+        android:pathData="M41.8,47.5 a5.2,5.2 0 1,0 10.4,0 a5.2,5.2 0 1,0 -10.4,0"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.4"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M40.6,59.5 a6.4,6.4 0 1,0 12.8,0 a6.4,6.4 0 1,0 -12.8,0"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.4"
+        android:fillColor="#00000000" />
+
+    <!-- Правая восьмёрка -->
+    <path
+        android:pathData="M55.8,47.5 a5.2,5.2 0 1,0 10.4,0 a5.2,5.2 0 1,0 -10.4,0"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.4"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M54.6,59.5 a6.4,6.4 0 1,0 12.8,0 a6.4,6.4 0 1,0 -12.8,0"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.4"
+        android:fillColor="#00000000" />
+</vector>
