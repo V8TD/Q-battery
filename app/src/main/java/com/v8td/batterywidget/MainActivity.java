@@ -16,6 +16,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -26,14 +27,18 @@ import android.widget.Toast;
 public final class MainActivity extends Activity {
 
     private static final int REQ_SOUND = 4107;
+    private static final String[] SCALE_LABELS =
+            {"100", "90", "80", "70", "60", "50", "40", "30", "20", "10"};
 
     private int widgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
     private boolean configuring;
 
-    private TextView subtitle, status, tvThreshold, tvSoundName;
+    private TextView subtitle, status, tvThreshold;
     private Switch swSound;
     private SeekBar seek;
     private LinearLayout palettePreview;
+    private Button btnSoundPick;
+    private ImageButton btnSoundTest;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -86,10 +91,11 @@ public final class MainActivity extends Activity {
         subtitle = findViewById(R.id.subtitle);
         status = findViewById(R.id.status_card);
         tvThreshold = findViewById(R.id.tv_threshold);
-        tvSoundName = findViewById(R.id.tv_sound_name);
         swSound = findViewById(R.id.sw_sound);
         seek = findViewById(R.id.seek_threshold);
         palettePreview = findViewById(R.id.palette_preview);
+        btnSoundPick = findViewById(R.id.btn_sound_pick);
+        btnSoundTest = findViewById(R.id.btn_sound_test);
 
         subtitle.setText("Версия " + BuildConfig.VERSION_NAME + " · виджет 1×1");
 
@@ -111,6 +117,7 @@ public final class MainActivity extends Activity {
         swSound.setChecked(Prefs.soundEnabled(this));
         swSound.setOnCheckedChangeListener((b, checked) -> {
             Prefs.setSoundEnabled(this, checked);
+            applySoundEnabled();
             refreshWidget();
         });
 
@@ -119,7 +126,7 @@ public final class MainActivity extends Activity {
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar s, int progress, boolean fromUser) {
-                tvThreshold.setText("Порог сигнала: " + (progress + 50) + "%");
+                tvThreshold.setText("когда заряд дойдёт до " + (progress + 50) + "%");
                 if (fromUser) Prefs.setThreshold(MainActivity.this, progress + 50);
             }
 
@@ -132,11 +139,8 @@ public final class MainActivity extends Activity {
             }
         });
 
-        Button pick = findViewById(R.id.btn_sound_pick);
-        pick.setOnClickListener(v -> pickSound());
-
-        Button test = findViewById(R.id.btn_sound_test);
-        test.setOnClickListener(v -> App.exec(() -> SoundPlayer.play(this)));
+        btnSoundPick.setOnClickListener(v -> pickSound());
+        btnSoundTest.setOnClickListener(v -> App.exec(() -> SoundPlayer.play(this)));
 
         Button autostart = findViewById(R.id.btn_autostart);
         autostart.setOnClickListener(v -> SystemLinks.openAutostart(this));
@@ -162,51 +166,80 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshUi() {
-        tvThreshold.setText("Порог сигнала: " + Prefs.threshold(this) + "%");
+        tvThreshold.setText("когда заряд дойдёт до " + Prefs.threshold(this) + "%");
         swSound.setChecked(Prefs.soundEnabled(this));
         seek.setProgress(Prefs.threshold(this) - 50);
 
         palettePreview.removeAllViews();
         for (int i = 0; i < Prefs.BANDS; i++) {
-            View chip = new View(this);
+            final int band = i;
+            int color = Prefs.color(this, i);
+
+            TextView cell = new TextView(this);
+            cell.setText(SCALE_LABELS[i]);
+            cell.setGravity(Gravity.CENTER);
+            cell.setTextSize(10);
+            cell.setTextColor(ColorPicker.contrast(color));
             GradientDrawable shape = new GradientDrawable();
-            shape.setColor(Prefs.color(this, i));
-            shape.setCornerRadius(dp(4));
-            chip.setBackground(shape);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(14), 1f);
+            shape.setColor(color);
+            shape.setCornerRadius(dp(5));
+            cell.setBackground(shape);
+            cell.setOnClickListener(v -> openBandEditor(band));
+
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(28), 1f);
             lp.setMargins(dp(1), 0, dp(1), 0);
-            palettePreview.addView(chip, lp);
+            palettePreview.addView(cell, lp);
         }
 
         BatteryState s = BatteryReader.read(this);
-        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        boolean free = pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+        boolean free = FirstRun.batteryUnrestricted(this);
 
         StringBuilder sb = new StringBuilder();
         sb.append("Сейчас: ");
         sb.append(s.valid ? s.percent + "%" : "данные недоступны");
         sb.append(s.charging ? " · зарядка подключена" : " · от батареи");
         sb.append("\nСхема: ").append(Prefs.PALETTE_NAMES[Prefs.palette(this)]);
-        sb.append("\nОбновление: по событиям системы, при включении экрана и раз в 15 минут");
+        sb.append("\nОбновление: по событиям системы и при включении экрана");
         sb.append("\nОптимизация батареи: ").append(free ? "без ограничений" : "ограничена");
         status.setText(sb.toString());
 
-        refreshSoundName();
+        refreshSoundButton();
         refreshBackgroundStates();
+        applySoundEnabled();
     }
 
-    private void refreshSoundName() {
+    private void applySoundEnabled() {
+        boolean on = Prefs.soundEnabled(this);
+        float alpha = on ? 1f : 0.45f;
+        seek.setEnabled(on);
+        btnSoundPick.setEnabled(on);
+        btnSoundTest.setEnabled(on);
+        seek.setAlpha(alpha);
+        tvThreshold.setAlpha(alpha);
+        btnSoundPick.setAlpha(alpha);
+        btnSoundTest.setAlpha(alpha);
+    }
+
+    private void refreshSoundButton() {
         String saved = Prefs.soundUri(this);
         Uri uri = saved == null
                 ? RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
                 : Uri.parse(saved);
-        String name = "системный звук уведомления";
+        String name = "системный звук";
         try {
             Ringtone r = RingtoneManager.getRingtone(this, uri);
-            if (r != null) name = r.getTitle(this);
+            if (r != null && r.getTitle(this) != null) name = r.getTitle(this);
         } catch (Throwable ignored) {
         }
-        tvSoundName.setText("Звук: " + name);
+        btnSoundPick.setText(twoLine("Выбор сигнала", name, getColor(R.color.muted)));
+    }
+
+    private void openBandEditor(int band) {
+        ColorPicker.open(this, Prefs.BAND_NAMES[band], Prefs.color(this, band), color -> {
+            Prefs.setUserColor(this, band, color);
+            refreshWidget();
+            refreshUi();
+        });
     }
 
     private void showPalettes() {
@@ -231,7 +264,7 @@ public final class MainActivity extends Activity {
             TextView name = new TextView(this);
             name.setText(Prefs.PALETTE_NAMES[i] + (Prefs.palette(this) == i ? "  ✓" : ""));
             name.setTextSize(16);
-            name.setTextColor(0xFFE8EEF7);
+            name.setTextColor(getColor(R.color.text));
             row.addView(name);
 
             LinearLayout chips = new LinearLayout(this);
@@ -271,49 +304,53 @@ public final class MainActivity extends Activity {
         scroll.addView(list);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Цвет по диапазонам")
+                .setTitle("Свои цвета")
                 .setView(scroll)
                 .setNegativeButton("Готово", null)
                 .create();
 
         for (int i = 0; i < Prefs.BANDS; i++) {
             final int band = i;
+            int color = Prefs.color(this, i);
+            int fg = ColorPicker.contrast(color);
+
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(4), dp(10), dp(4), dp(10));
-
-            View swatch = new View(this);
-            GradientDrawable shape = new GradientDrawable();
-            shape.setColor(Prefs.color(this, i));
-            shape.setCornerRadius(dp(5));
-            shape.setStroke(dp(1), 0x66889099);
-            swatch.setBackground(shape);
-            row.addView(swatch, new LinearLayout.LayoutParams(dp(32), dp(26)));
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(color);
+            bg.setCornerRadius(dp(8));
+            bg.setStroke(dp(1), 0x33888888);
+            row.setBackground(bg);
 
             TextView label = new TextView(this);
             label.setText(Prefs.BAND_NAMES[i]);
-            label.setTextSize(16);
-            label.setTextColor(0xFFE8EEF7);
-            label.setPadding(dp(14), 0, 0, 0);
+            label.setTextSize(15);
+            label.setTextColor(fg);
+            label.setPadding(dp(14), dp(12), 0, dp(12));
             row.addView(label, new LinearLayout.LayoutParams(0, -2, 1f));
 
-            TextView edit = new TextView(this);
-            edit.setText("Изменить ›");
-            edit.setTextSize(14);
-            edit.setTextColor(0xFF35D9FF);
-            row.addView(edit);
+            TextView arrow = new TextView(this);
+            arrow.setText("›");
+            arrow.setTextSize(18);
+            arrow.setTextColor(fg);
+            arrow.setPadding(0, 0, dp(14), 0);
+            row.addView(arrow);
 
             row.setOnClickListener(v -> {
                 dialog.dismiss();
-                ColorPicker.open(this, Prefs.BAND_NAMES[band], Prefs.color(this, band), color -> {
-                    Prefs.setUserColor(this, band, color);
+                ColorPicker.open(this, Prefs.BAND_NAMES[band], Prefs.color(this, band), picked -> {
+                    Prefs.setUserColor(this, band, picked);
                     refreshWidget();
                     refreshUi();
                     showBands();
                 });
             });
-            list.addView(row);
+
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+            lp.topMargin = dp(3);
+            lp.bottomMargin = dp(3);
+            list.addView(row, lp);
         }
         dialog.show();
     }
@@ -349,7 +386,7 @@ public final class MainActivity extends Activity {
                 }
             }
             Prefs.setSoundUri(this, uri == null ? null : uri.toString());
-            refreshSoundName();
+            refreshSoundButton();
             Toast.makeText(this, "Звук сохранён", Toast.LENGTH_SHORT).show();
         }
     }
@@ -412,11 +449,11 @@ public final class MainActivity extends Activity {
         Button battery = findViewById(R.id.btn_battery);
         battery.setText(twoLine("Экономия заряда и фоновая работа",
                 free ? "Без ограничений ✓" : "Ограничена ✗",
-                free ? 0xFF3FBF7F : 0xFFE0A030));
+                getColor(free ? R.color.ok : R.color.warn)));
 
         Button autostart = findViewById(R.id.btn_autostart);
         autostart.setText(twoLine("Автозапуск (Xiaomi / HyperOS)",
-                "Состояние неизвестно — проверьте вручную", 0xFF93A3B8));
+                "Состояние неизвестно — проверьте вручную", getColor(R.color.muted)));
     }
 
     private CharSequence twoLine(String title, String state, int stateColor) {
