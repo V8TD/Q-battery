@@ -70,7 +70,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:lineSpacingExtra="3dp"
-                android:text="Виджет показывает заряд крупными цифрами на прозрачном фоне. После добавления нажимайте на него, чтобы открыть настройки. Отдельного значка в списке приложений нет."
+                android:text="Виджет показывает заряд крупными цифрами на прозрачном фоне. После добавления нажимайте на него, чтобы открыть настройки. Значок в списке приложений можно включить в разделе «Системные настройки»."
                 android:textColor="@color/muted"
                 android:textSize="15sp" />
 
@@ -109,7 +109,7 @@
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
                     android:gravity="center"
-                    android:text="Свои цвета" />
+                    android:text="Цвета схемы" />
             </LinearLayout>
 
             <LinearLayout
@@ -120,15 +120,15 @@
                 android:orientation="horizontal" />
 
             <Switch
-android:id="@+id/sw_charging_blue"
-android:layout_width="match_parent"
-android:layout_height="wrap_content"
-android:layout_marginTop="10dp"
-android:minHeight="44dp"
-android:text="Синие цифры при зарядке"
-android:textColor="@color/text"
-android:textSize="15sp" />
-            
+                android:id="@+id/sw_charging_blue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:minHeight="44dp"
+                android:text="Синие цифры при зарядке"
+                android:textColor="@color/text"
+                android:textSize="15sp" />
+
             <TextView style="@style/Section" android:text="Сигнал о зарядке" />
 
             <Switch
@@ -184,14 +184,46 @@ android:textSize="15sp" />
 
             <TextView style="@style/Section" android:text="Работа в фоне" />
 
-            <Button android:id="@+id/btn_autostart" style="@style/Btn"
-                android:text="Автозапуск" />
+            <Button
+                android:id="@+id/btn_system"
+                style="@style/Btn"
+                android:text="Системные настройки" />
 
-            <Button android:id="@+id/btn_battery" style="@style/Btn"
-                android:text="Экономия заряда" />
+            <LinearLayout
+                android:id="@+id/system_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
 
-            <Button android:id="@+id/btn_appinfo" style="@style/Btn"
-                android:text="Системные настройки приложения" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="2dp"
+                    android:text="Приложение не может отключить системные ограничения само — оно только открывает нужный раздел. Если Q-battery не находится в списке экономии заряда, включите значок ниже и поищите снова."
+                    android:textColor="@color/muted"
+                    android:textSize="13sp" />
+
+                <Switch
+                    android:id="@+id/sw_launcher_icon"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:minHeight="44dp"
+                    android:text="Показывать значок в списке приложений"
+                    android:textColor="@color/text"
+                    android:textSize="15sp" />
+
+                <Button android:id="@+id/btn_autostart" style="@style/Btn"
+                    android:text="Автозапуск" />
+
+                <Button android:id="@+id/btn_battery" style="@style/Btn"
+                    android:text="Экономия заряда" />
+
+                <Button android:id="@+id/btn_appinfo" style="@style/Btn"
+                    android:text="Системные настройки приложения" />
+            </LinearLayout>
 
             <Button android:id="@+id/btn_help" style="@style/Btn"
                 android:text="Если виджет отстаёт — что проверить" />
