@@ -31,7 +31,7 @@ public final class MainActivity extends Activity {
     private int widgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
     private boolean configuring;
     private TextView subtitle, status, tvThreshold;
-    private Switch swSound;
+    private Switch swSound, swChargingBlue;
     private SeekBar seek;
     private LinearLayout palettePreview;
     private Button btnSoundPick;
@@ -107,6 +107,13 @@ public final class MainActivity extends Activity {
         bands.setText("Цвета схемы");
         bands.setOnClickListener(v -> showBands(Prefs.palette(this)));
 
+        swChargingBlue = findViewById(R.id.sw_charging_blue);
+        swChargingBlue.setChecked(Prefs.chargingBlue(this));
+        swChargingBlue.setOnCheckedChangeListener((b, checked) -> {
+            Prefs.setChargingBlue(this, checked);
+            refreshWidget();
+        });
+
         swSound.setChecked(Prefs.soundEnabled(this));
         swSound.setOnCheckedChangeListener((b, checked) -> {
             Prefs.setSoundEnabled(this, checked);
@@ -158,6 +165,8 @@ public final class MainActivity extends Activity {
         swSound.setChecked(Prefs.soundEnabled(this));
         seek.setProgress(Prefs.threshold(this) - 50);
 
+                swChargingBlue.setChecked(Prefs.chargingBlue(this));
+        
         palettePreview.removeAllViews();
         for (int i = 0; i < Prefs.BANDS; i++) {
             final int band = i;
