@@ -11,7 +11,6 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
@@ -25,14 +24,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public final class MainActivity extends Activity {
-
     private static final int REQ_SOUND = 4107;
     private static final String[] SCALE_LABELS =
             {"100", "90", "80", "70", "60", "50", "40", "30", "20", "10"};
 
     private int widgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
     private boolean configuring;
-
     private TextView subtitle, status, tvThreshold;
     private Switch swSound;
     private SeekBar seek;
@@ -44,7 +41,6 @@ public final class MainActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_settings);
-
         widgetId = getIntent().getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
                 AppWidgetManager.INVALID_APPWIDGET_ID);
         configuring = widgetId != AppWidgetManager.INVALID_APPWIDGET_ID;
@@ -52,13 +48,10 @@ public final class MainActivity extends Activity {
             setResult(RESULT_CANCELED, new Intent()
                     .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId));
         }
-
         applyInsets();
         bind();
-
         findViewById(R.id.config_box).setVisibility(configuring ? View.VISIBLE : View.GONE);
         findViewById(R.id.settings_box).setVisibility(configuring ? View.GONE : View.VISIBLE);
-
         if (!configuring) {
             App.exec(() -> WidgetUpdater.refresh(this, true));
             App.watch(this);
@@ -96,7 +89,6 @@ public final class MainActivity extends Activity {
         palettePreview = findViewById(R.id.palette_preview);
         btnSoundPick = findViewById(R.id.btn_sound_pick);
         btnSoundTest = findViewById(R.id.btn_sound_test);
-
         subtitle.setText("Версия " + BuildConfig.VERSION_NAME + " · виджет 1×1");
 
         Button add = findViewById(R.id.btn_add);
@@ -112,7 +104,8 @@ public final class MainActivity extends Activity {
         palette.setOnClickListener(v -> showPalettes());
 
         Button bands = findViewById(R.id.btn_bands);
-        bands.setOnClickListener(v -> showBands());
+        bands.setText("Цвета схемы");
+        bands.setOnClickListener(v -> showBands(Prefs.palette(this)));
 
         swSound.setChecked(Prefs.soundEnabled(this));
         swSound.setOnCheckedChangeListener((b, checked) -> {
@@ -144,19 +137,14 @@ public final class MainActivity extends Activity {
 
         Button autostart = findViewById(R.id.btn_autostart);
         autostart.setOnClickListener(v -> SystemLinks.openAutostart(this));
-
         Button battery = findViewById(R.id.btn_battery);
         battery.setOnClickListener(v -> SystemLinks.openBatterySettings(this));
-
         Button appInfo = findViewById(R.id.btn_appinfo);
         appInfo.setOnClickListener(v -> SystemLinks.openAppDetails(this));
-
         Button help = findViewById(R.id.btn_help);
         help.setOnClickListener(v -> showHelp());
-
         Button about = findViewById(R.id.btn_about);
         about.setOnClickListener(v -> showAbout());
-
         Button reset = findViewById(R.id.btn_reset);
         reset.setOnClickListener(v -> confirmReset());
     }
@@ -174,7 +162,6 @@ public final class MainActivity extends Activity {
         for (int i = 0; i < Prefs.BANDS; i++) {
             final int band = i;
             int color = Prefs.color(this, i);
-
             TextView cell = new TextView(this);
             cell.setText(SCALE_LABELS[i]);
             cell.setGravity(Gravity.CENTER);
@@ -185,7 +172,10 @@ public final class MainActivity extends Activity {
             shape.setCornerRadius(dp(5));
             cell.setBackground(shape);
             cell.setOnClickListener(v -> openBandEditor(band));
-
+            cell.setOnLongClickListener(v -> {
+                confirmResetBand(Prefs.palette(this), band, false);
+                return true;
+            });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(28), 1f);
             lp.setMargins(dp(1), 0, dp(1), 0);
             palettePreview.addView(cell, lp);
@@ -193,12 +183,13 @@ public final class MainActivity extends Activity {
 
         BatteryState s = BatteryReader.read(this);
         boolean free = FirstRun.batteryUnrestricted(this);
-
+        int active = Prefs.palette(this);
         StringBuilder sb = new StringBuilder();
         sb.append("Сейчас: ");
         sb.append(s.valid ? s.percent + "%" : "данные недоступны");
         sb.append(s.charging ? " · зарядка подключена" : " · от батареи");
-        sb.append("\nСхема: ").append(Prefs.PALETTE_NAMES[Prefs.palette(this)]);
+        sb.append("\nСхема: ").append(Prefs.PALETTE_NAMES[active]);
+        if (Prefs.isModified(this, active)) sb.append(" · изменена");
         sb.append("\nОбновление: по событиям системы и при включении экрана");
         sb.append("\nОптимизация батареи: ").append(free ? "без ограничений" : "ограничена");
         status.setText(sb.toString());
@@ -236,7 +227,7 @@ public final class MainActivity extends Activity {
 
     private void openBandEditor(int band) {
         ColorPicker.open(this, Prefs.BAND_NAMES[band], Prefs.color(this, band), color -> {
-            Prefs.setUserColor(this, band, color);
+            Prefs.setColor(this, Prefs.palette(this), band, color);
             refreshWidget();
             refreshUi();
         });
@@ -246,23 +237,33 @@ public final class MainActivity extends Activity {
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         list.setPadding(dp(16), dp(8), dp(16), dp(8));
+
+        TextView hint = new TextView(this);
+        hint.setText("Нажми на схему — сделать её активной. Любую схему можно настроить и сбросить.");
+        hint.setTextSize(12);
+        hint.setTextColor(getColor(R.color.muted));
+        hint.setPadding(dp(6), 0, dp(6), dp(8));
+        list.addView(hint);
+
         ScrollView scroll = new ScrollView(this);
         scroll.addView(list);
-
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Цветовая схема")
                 .setView(scroll)
                 .setNegativeButton("Закрыть", null)
                 .create();
 
-        for (int i = 0; i < Prefs.PALETTE_NAMES.length; i++) {
+        for (int i = 0; i < Prefs.paletteCount(); i++) {
             final int index = i;
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
             row.setPadding(dp(6), dp(10), dp(6), dp(10));
 
             TextView name = new TextView(this);
-            name.setText(Prefs.PALETTE_NAMES[i] + (Prefs.palette(this) == i ? "  ✓" : ""));
+            String title = Prefs.PALETTE_NAMES[i];
+            if (Prefs.palette(this) == i) title += "  ✓";
+            if (Prefs.isModified(this, i)) title += "  · изменена";
+            name.setText(title);
             name.setTextSize(16);
             name.setTextColor(getColor(R.color.text));
             row.addView(name);
@@ -271,12 +272,9 @@ public final class MainActivity extends Activity {
             chips.setOrientation(LinearLayout.HORIZONTAL);
             chips.setPadding(0, dp(6), 0, 0);
             for (int b = 0; b < Prefs.BANDS; b++) {
-                int color = i < Prefs.PALETTES.length
-                        ? Prefs.PALETTES[i][b]
-                        : Prefs.get(this).getInt("user_" + b, Prefs.PALETTES[0][b]);
                 View chip = new View(this);
                 GradientDrawable shape = new GradientDrawable();
-                shape.setColor(color);
+                shape.setColor(Prefs.colorOf(this, i, b));
                 shape.setCornerRadius(dp(3));
                 chip.setBackground(shape);
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(14), 1f);
@@ -284,6 +282,7 @@ public final class MainActivity extends Activity {
                 chips.addView(chip, lp);
             }
             row.addView(chips);
+
             row.setOnClickListener(v -> {
                 Prefs.setPalette(this, index);
                 refreshWidget();
@@ -291,27 +290,64 @@ public final class MainActivity extends Activity {
                 dialog.dismiss();
                 Toast.makeText(this, Prefs.PALETTE_NAMES[index], Toast.LENGTH_SHORT).show();
             });
+
+            LinearLayout actions = new LinearLayout(this);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
+            actions.setPadding(0, dp(6), 0, 0);
+
+            TextView edit = new TextView(this);
+            edit.setText("Настроить");
+            edit.setTextSize(13);
+            edit.setTextColor(getColor(R.color.text));
+            edit.setPadding(dp(6), dp(6), dp(20), dp(6));
+            edit.setOnClickListener(v -> {
+                dialog.dismiss();
+                showBands(index);
+            });
+            actions.addView(edit);
+
+            TextView reset = new TextView(this);
+            reset.setText("Сбросить");
+            reset.setTextSize(13);
+            reset.setTextColor(getColor(R.color.muted));
+            reset.setPadding(dp(6), dp(6), dp(6), dp(6));
+            reset.setOnClickListener(v -> {
+                dialog.dismiss();
+                confirmResetPalette(index);
+            });
+            actions.addView(reset);
+
+            row.addView(actions);
             list.addView(row);
         }
         dialog.show();
     }
 
-    private void showBands() {
+    private void showBands(int paletteIndex) {
+        final int pal = paletteIndex;
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         list.setPadding(dp(16), dp(8), dp(16), dp(8));
+
+        TextView hint = new TextView(this);
+        hint.setText("Нажми — изменить цвет. Долгое нажатие — вернуть заводской цвет диапазона.");
+        hint.setTextSize(12);
+        hint.setTextColor(getColor(R.color.muted));
+        hint.setPadding(0, 0, 0, dp(8));
+        list.addView(hint);
+
         ScrollView scroll = new ScrollView(this);
         scroll.addView(list);
-
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Свои цвета")
+                .setTitle("Цвета: " + Prefs.PALETTE_NAMES[pal])
                 .setView(scroll)
+                .setNeutralButton("Сбросить схему", (d, w) -> confirmResetPalette(pal))
                 .setNegativeButton("Готово", null)
                 .create();
 
         for (int i = 0; i < Prefs.BANDS; i++) {
             final int band = i;
-            int color = Prefs.color(this, i);
+            int color = Prefs.colorOf(this, pal, i);
             int fg = ColorPicker.contrast(color);
 
             LinearLayout row = new LinearLayout(this);
@@ -339,12 +375,18 @@ public final class MainActivity extends Activity {
 
             row.setOnClickListener(v -> {
                 dialog.dismiss();
-                ColorPicker.open(this, Prefs.BAND_NAMES[band], Prefs.color(this, band), picked -> {
-                    Prefs.setUserColor(this, band, picked);
-                    refreshWidget();
-                    refreshUi();
-                    showBands();
-                });
+                ColorPicker.open(this, Prefs.BAND_NAMES[band],
+                        Prefs.colorOf(this, pal, band), picked -> {
+                            Prefs.setColor(this, pal, band, picked);
+                            refreshWidget();
+                            refreshUi();
+                            showBands(pal);
+                        });
+            });
+            row.setOnLongClickListener(v -> {
+                dialog.dismiss();
+                confirmResetBand(pal, band, true);
+                return true;
             });
 
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
@@ -353,6 +395,44 @@ public final class MainActivity extends Activity {
             list.addView(row, lp);
         }
         dialog.show();
+    }
+
+    private void confirmResetPalette(int paletteIndex) {
+        final int pal = paletteIndex;
+        String msg = pal == Prefs.userPaletteIndex()
+                ? "Схема «Особая» вернётся к цветам Стандарта. Остальные схемы не изменятся."
+                : "Цвета схемы «" + Prefs.PALETTE_NAMES[pal]
+                + "» вернутся к заводским. Остальные схемы не изменятся.";
+        new AlertDialog.Builder(this)
+                .setTitle("Сбросить схему?")
+                .setMessage(msg)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Сбросить", (d, w) -> {
+                    Prefs.resetPalette(this, pal);
+                    WidgetUpdater.forget();
+                    refreshWidget();
+                    refreshUi();
+                    Toast.makeText(this, "Схема сброшена", Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
+    private void confirmResetBand(int paletteIndex, int band, boolean reopen) {
+        final int pal = paletteIndex;
+        final int b = band;
+        new AlertDialog.Builder(this)
+                .setTitle("Вернуть заводской цвет?")
+                .setMessage(Prefs.BAND_NAMES[b] + " — цвет вернётся к заводскому для схемы «"
+                        + Prefs.PALETTE_NAMES[pal] + "».")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Вернуть", (d, w) -> {
+                    Prefs.resetBand(this, pal, b);
+                    WidgetUpdater.forget();
+                    refreshWidget();
+                    refreshUi();
+                    if (reopen) showBands(pal);
+                })
+                .show();
     }
 
     private void pickSound() {
@@ -422,7 +502,8 @@ public final class MainActivity extends Activity {
     private void confirmReset() {
         new AlertDialog.Builder(this)
                 .setTitle("Сбросить настройки?")
-                .setMessage("Цвета и параметры звука вернутся к исходным. Виджет останется на месте, "
+                .setMessage("Все схемы вернутся к заводским цветам, «Особая» — к цветам Стандарта. "
+                        + "Параметры звука сбросятся. Виджет останется на месте, "
                         + "системные разрешения и автозапуск не изменятся.")
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Сбросить", (d, w) -> {
