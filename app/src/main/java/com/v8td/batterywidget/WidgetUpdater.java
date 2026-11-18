@@ -49,7 +49,7 @@ final class WidgetUpdater {
 
             ChargeAlert.onState(app, state);
 
-            int color = state.charging
+            int color = (state.charging && Prefs.chargingBlue(app))
                     ? Prefs.CHARGING_COLOR
                     : Prefs.color(app, BatteryState.band(state.percent));
             int revision = Prefs.revision();
