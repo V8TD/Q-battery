@@ -41,7 +41,7 @@ final class Prefs {
     private Prefs() {
     }
 
-    private static synchronized void init(Context c) {
+    static synchronized void init(Context c) {
         if (sp == null) {
             sp = c.getApplicationContext().getSharedPreferences(FILE, Context.MODE_PRIVATE);
             migrate(sp);
