@@ -13,7 +13,7 @@ final class Prefs {
     static final int CHARGING_COLOR = 0xFF35D9FF;
 
     static final String[] PALETTE_NAMES = {
-            "Стандарт", "Неон", "Пастель", "Карамель", "Особая"
+            "Стандарт", "Неон", "Пастель", "Карамель", "Арлекин"
     };
 
     /** Заводские цвета. Порядок: от 91–100% вниз до 0–10%. */
@@ -26,6 +26,12 @@ final class Prefs {
              0xFFFFCCBC, 0xFFFFAB91, 0xFFEF9A9A, 0xFFE5989B, 0xFFCE93D8},
             {0xFF00806A, 0xFF1B8A3A, 0xFF4C8C1E, 0xFF7D8A0A, 0xFF9A7B00,
              0xFFB26A00, 0xFFC05500, 0xFFC62828, 0xFFA01020, 0xFF7A0A18}
+    };
+
+    /** Арлекин: мозаика несочетаемых цветов. Порядок тот же. */
+    private static final int[] HARLEQUIN = {
+            0xFFC6FF00, 0xFFFF00A8, 0xFF00E5FF, 0xFFFF6D00, 0xFF4D5BFF,
+            0xFFFFD400, 0xFF00C853, 0xFFFF2D55, 0xFFB388FF, 0xFFC8A020
     };
 
     static final String[] BAND_NAMES = {
@@ -61,12 +67,12 @@ final class Prefs {
         revision++;
     }
 
-    /** Всего схем: четыре заводские плюс Особая. */
+    /** Всего схем: четыре градиентные плюс Арлекин. */
     static int paletteCount() {
         return PALETTES.length + 1;
     }
 
-    /** Индекс Особой схемы. Имя сохранено для совместимости. */
+    /** Индекс схемы Арлекин. Имя метода сохранено для совместимости. */
     static int userPaletteIndex() {
         return PALETTES.length;
     }
@@ -108,7 +114,7 @@ final class Prefs {
         setColor(c, palette(c), band, color);
     }
 
-        /** Синий при зарядке. По умолчанию выключен. */
+    /** Синий при зарядке. По умолчанию выключен. */
     static boolean chargingBlue(Context c) {
         return get(c).getBoolean("charging_blue", false);
     }
@@ -127,7 +133,7 @@ final class Prefs {
         return false;
     }
 
-    /** Возвращает схему к заводским цветам. Для Особой заводское = Стандарт. */
+    /** Возвращает схему к заводским цветам. Для Арлекина заводское = мозаика. */
     static void resetPalette(Context c, int paletteIndex) {
         int pal = clampPalette(paletteIndex);
         SharedPreferences.Editor e = get(c).edit();
@@ -148,7 +154,7 @@ final class Prefs {
     static int factory(int paletteIndex, int band) {
         int pal = clampPalette(paletteIndex);
         int idx = clampBand(band);
-        return pal < PALETTES.length ? PALETTES[pal][idx] : PALETTES[0][idx];
+        return pal < PALETTES.length ? PALETTES[pal][idx] : HARLEQUIN[idx];
     }
 
     private static int clampPalette(int p) {
@@ -171,7 +177,7 @@ final class Prefs {
             for (int b = 0; b < BANDS; b++) e.putInt(key(pal, b), PALETTES[pal][b]);
         }
         for (int b = 0; b < BANDS; b++) {
-            e.putInt(key(userPaletteIndex(), b), p.getInt("user_" + b, PALETTES[0][b]));
+            e.putInt(key(userPaletteIndex(), b), p.getInt("user_" + b, HARLEQUIN[b]));
         }
         e.putBoolean(MIGRATED, true);
         e.apply();
