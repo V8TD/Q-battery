@@ -119,6 +119,16 @@
                 android:layout_marginTop="10dp"
                 android:orientation="horizontal" />
 
+            <Switch
+android:id="@+id/sw_charging_blue"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:layout_marginTop="10dp"
+android:minHeight="44dp"
+android:text="Синие цифры при зарядке"
+android:textColor="@color/text"
+android:textSize="15sp" />
+            
             <TextView style="@style/Section" android:text="Сигнал о зарядке" />
 
             <Switch
