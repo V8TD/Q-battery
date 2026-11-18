@@ -3,7 +3,9 @@ package com.v8td.batterywidget;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Insets;
 import android.graphics.drawable.GradientDrawable;
 import android.media.Ringtone;
@@ -25,16 +27,17 @@ import android.widget.Toast;
 
 public final class MainActivity extends Activity {
     private static final int REQ_SOUND = 4107;
+    private static final String ALIAS = "com.v8td.batterywidget.LauncherAlias";
     private static final String[] SCALE_LABELS =
             {"100", "90", "80", "70", "60", "50", "40", "30", "20", "10"};
 
     private int widgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
     private boolean configuring;
     private TextView subtitle, status, tvThreshold;
-    private Switch swSound, swChargingBlue;
+    private Switch swSound, swChargingBlue, swLauncherIcon;
     private SeekBar seek;
-    private LinearLayout palettePreview;
-    private Button btnSoundPick;
+    private LinearLayout palettePreview, systemBox;
+    private Button btnSoundPick, btnSystem;
     private ImageButton btnSoundTest;
 
     @Override
@@ -89,6 +92,9 @@ public final class MainActivity extends Activity {
         palettePreview = findViewById(R.id.palette_preview);
         btnSoundPick = findViewById(R.id.btn_sound_pick);
         btnSoundTest = findViewById(R.id.btn_sound_test);
+        systemBox = findViewById(R.id.system_box);
+        btnSystem = findViewById(R.id.btn_system);
+        swLauncherIcon = findViewById(R.id.sw_launcher_icon);
         subtitle.setText("Версия " + BuildConfig.VERSION_NAME + " · виджет 1×1");
 
         Button add = findViewById(R.id.btn_add);
@@ -142,6 +148,13 @@ public final class MainActivity extends Activity {
         btnSoundPick.setOnClickListener(v -> pickSound());
         btnSoundTest.setOnClickListener(v -> App.exec(() -> SoundPlayer.play(this)));
 
+        btnSystem.setOnClickListener(v -> {
+            boolean show = systemBox.getVisibility() != View.VISIBLE;
+            systemBox.setVisibility(show ? View.VISIBLE : View.GONE);
+            updateSystemButton();
+        });
+        syncLauncherIcon();
+
         Button autostart = findViewById(R.id.btn_autostart);
         autostart.setOnClickListener(v -> SystemLinks.openAutostart(this));
         Button battery = findViewById(R.id.btn_battery);
@@ -156,6 +169,43 @@ public final class MainActivity extends Activity {
         reset.setOnClickListener(v -> confirmReset());
     }
 
+    private void updateSystemButton() {
+        boolean open = systemBox.getVisibility() == View.VISIBLE;
+        btnSystem.setText(twoLine("Системные настройки",
+                open ? "нажмите, чтобы свернуть ▲" : "автозапуск, экономия заряда, значок ▼",
+                getColor(R.color.muted)));
+    }
+
+    private boolean launcherIconEnabled() {
+        try {
+            int st = getPackageManager().getComponentEnabledSetting(new ComponentName(this, ALIAS));
+            return st == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private void syncLauncherIcon() {
+        swLauncherIcon.setOnCheckedChangeListener(null);
+        swLauncherIcon.setChecked(launcherIconEnabled());
+        swLauncherIcon.setOnCheckedChangeListener((b, checked) -> setLauncherIcon(checked));
+    }
+
+    private void setLauncherIcon(boolean on) {
+        try {
+            getPackageManager().setComponentEnabledSetting(new ComponentName(this, ALIAS),
+                    on ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                            : PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP);
+            Toast.makeText(this, on
+                    ? "Значок включён. Список приложений может обновиться не сразу."
+                    : "Значок выключен.", Toast.LENGTH_LONG).show();
+        } catch (Throwable t) {
+            Toast.makeText(this, "Не удалось изменить значок", Toast.LENGTH_LONG).show();
+            syncLauncherIcon();
+        }
+    }
+
     private void refreshWidget() {
         App.exec(() -> WidgetUpdater.refresh(this, true));
     }
@@ -164,15 +214,16 @@ public final class MainActivity extends Activity {
         tvThreshold.setText("когда заряд дойдёт до " + Prefs.threshold(this) + "%");
         swSound.setChecked(Prefs.soundEnabled(this));
         seek.setProgress(Prefs.threshold(this) - 50);
+        swChargingBlue.setChecked(Prefs.chargingBlue(this));
+        syncLauncherIcon();
+        updateSystemButton();
 
-                swChargingBlue.setChecked(Prefs.chargingBlue(this));
-        
         palettePreview.removeAllViews();
         for (int i = 0; i < Prefs.BANDS; i++) {
-            final int band = i;
-            int color = Prefs.color(this, i);
+            final int band = Prefs.BANDS - 1 - i;
+            int color = Prefs.color(this, band);
             TextView cell = new TextView(this);
-            cell.setText(SCALE_LABELS[i]);
+            cell.setText(SCALE_LABELS[band]);
             cell.setGravity(Gravity.CENTER);
             cell.setTextSize(10);
             cell.setTextColor(ColorPicker.contrast(color));
@@ -280,10 +331,11 @@ public final class MainActivity extends Activity {
             LinearLayout chips = new LinearLayout(this);
             chips.setOrientation(LinearLayout.HORIZONTAL);
             chips.setPadding(0, dp(6), 0, 0);
-            for (int b = 0; b < Prefs.BANDS; b++) {
+            for (int j = 0; j < Prefs.BANDS; j++) {
+                int band = Prefs.BANDS - 1 - j;
                 View chip = new View(this);
                 GradientDrawable shape = new GradientDrawable();
-                shape.setColor(Prefs.colorOf(this, i, b));
+                shape.setColor(Prefs.colorOf(this, index, band));
                 shape.setCornerRadius(dp(3));
                 chip.setBackground(shape);
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(14), 1f);
@@ -339,7 +391,11 @@ public final class MainActivity extends Activity {
         list.setPadding(dp(16), dp(8), dp(16), dp(8));
 
         TextView hint = new TextView(this);
-        hint.setText("Нажми — изменить цвет. Долгое нажатие — вернуть заводской цвет диапазона.");
+        String hintText = "Нажми — изменить цвет. Долгое нажатие — вернуть заводской цвет диапазона.";
+        if (pal == Prefs.userPaletteIndex()) {
+            hintText += "\nАрлекин — мозаика: цвет не подсказывает уровень заряда.";
+        }
+        hint.setText(hintText);
         hint.setTextSize(12);
         hint.setTextColor(getColor(R.color.muted));
         hint.setPadding(0, 0, 0, dp(8));
@@ -354,9 +410,9 @@ public final class MainActivity extends Activity {
                 .setNegativeButton("Готово", null)
                 .create();
 
-        for (int i = 0; i < Prefs.BANDS; i++) {
-            final int band = i;
-            int color = Prefs.colorOf(this, pal, i);
+        for (int j = 0; j < Prefs.BANDS; j++) {
+            final int band = Prefs.BANDS - 1 - j;
+            int color = Prefs.colorOf(this, pal, band);
             int fg = ColorPicker.contrast(color);
 
             LinearLayout row = new LinearLayout(this);
@@ -369,7 +425,7 @@ public final class MainActivity extends Activity {
             row.setBackground(bg);
 
             TextView label = new TextView(this);
-            label.setText(Prefs.BAND_NAMES[i]);
+            label.setText(Prefs.BAND_NAMES[band]);
             label.setTextSize(15);
             label.setTextColor(fg);
             label.setPadding(dp(14), dp(12), 0, dp(12));
@@ -409,7 +465,7 @@ public final class MainActivity extends Activity {
     private void confirmResetPalette(int paletteIndex) {
         final int pal = paletteIndex;
         String msg = pal == Prefs.userPaletteIndex()
-                ? "Схема «Особая» вернётся к цветам Стандарта. Остальные схемы не изменятся."
+                ? "Схема «Арлекин» вернётся к заводской мозаике. Остальные схемы не изменятся."
                 : "Цвета схемы «" + Prefs.PALETTE_NAMES[pal]
                 + "» вернутся к заводским. Остальные схемы не изменятся.";
         new AlertDialog.Builder(this)
@@ -490,6 +546,8 @@ public final class MainActivity extends Activity {
                         + "• Автозапуск приложения;\n"
                         + "• Экономию заряда — «Без ограничений»;\n"
                         + "• Фоновую активность, если такой пункт есть.\n\n"
+                        + "Если Q-battery не находится в списке экономии заряда — включите значок "
+                        + "приложения в разделе «Системные настройки» и поищите снова.\n\n"
                         + "На других телефонах названия пунктов отличаются. Приложение не может "
                         + "отключить системные ограничения само — оно только открывает нужный раздел.")
                 .setPositiveButton("Понятно", null)
@@ -511,9 +569,9 @@ public final class MainActivity extends Activity {
     private void confirmReset() {
         new AlertDialog.Builder(this)
                 .setTitle("Сбросить настройки?")
-                .setMessage("Все схемы вернутся к заводским цветам, «Особая» — к цветам Стандарта. "
-                        + "Параметры звука сбросятся. Виджет останется на месте, "
-                        + "системные разрешения и автозапуск не изменятся.")
+                .setMessage("Все схемы вернутся к заводским цветам, «Арлекин» — к своей мозаике. "
+                        + "Параметры звука сбросятся. Виджет останется на месте, системные "
+                        + "разрешения, автозапуск и значок приложения не изменятся.")
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Сбросить", (d, w) -> {
                     Prefs.reset(this);
