@@ -7,22 +7,21 @@ import android.content.SharedPreferences;
 
 /** Единственное хранилище настроек приложения. */
 final class Prefs {
-
     static final String FILE = "q_battery_prefs";
     static final int BANDS = 10;
     static final int DEFAULT_THRESHOLD = 100;
     static final int CHARGING_COLOR = 0xFF35D9FF;
 
     static final String[] PALETTE_NAMES = {
-            "Стандарт", "Неон", "Пастель", "Карамель", "Пользовательская"
+            "Стандарт", "Неон", "Пастель", "Карамель", "Особая"
     };
 
-    /** Порядок: от 91–100% вниз до 0–10%. */
+    /** Заводские цвета. Порядок: от 91–100% вниз до 0–10%. */
     static final int[][] PALETTES = {
             {0xFF2ECC71, 0xFF57D06A, 0xFF8BD450, 0xFFC9D63F, 0xFFFFD23F,
              0xFFFFB03A, 0xFFFF8A34, 0xFFFF6B35, 0xFFF0453A, 0xFFD32F2F},
-            {0xFF00E676, 0xFF39FF14, 0xFF76FF03, 0xFFC6FF00, 0xFFFFEA00,
-             0xFFFFC400, 0xFFFF9100, 0xFFFF3D00, 0xFFFF1744, 0xFFD500F9},
+            {0xFF2EFF2E, 0xFF27C927, 0xFF76FF03, 0xFFC6FF00, 0xFFFFEA00,
+             0xFFFFC400, 0xFFFF9100, 0xFFFF3D00, 0xFFFF1744, 0xFFC41212},
             {0xFFA5D6A7, 0xFFB9E0A5, 0xFFD7E8A8, 0xFFF3E9A9, 0xFFFFE0B2,
              0xFFFFCCBC, 0xFFFFAB91, 0xFFEF9A9A, 0xFFE5989B, 0xFFCE93D8},
             {0xFF00806A, 0xFF1B8A3A, 0xFF4C8C1E, 0xFF7D8A0A, 0xFF9A7B00,
@@ -34,15 +33,18 @@ final class Prefs {
             "41–50%", "31–40%", "21–30%", "11–20%", "0–10%"
     };
 
+    private static final String MIGRATED = "palettes_v2";
+
     private static SharedPreferences sp;
     private static volatile int revision = 0;
 
     private Prefs() {
     }
 
-    static void init(Context c) {
+    private static synchronized void init(Context c) {
         if (sp == null) {
             sp = c.getApplicationContext().getSharedPreferences(FILE, Context.MODE_PRIVATE);
+            migrate(sp);
         }
     }
 
@@ -59,50 +61,110 @@ final class Prefs {
         revision++;
     }
 
+    /** Всего схем: четыре заводские плюс Особая. */
+    static int paletteCount() {
+        return PALETTES.length + 1;
+    }
+
+    /** Индекс Особой схемы. Имя сохранено для совместимости. */
     static int userPaletteIndex() {
         return PALETTES.length;
     }
 
     static int palette(Context c) {
         int p = get(c).getInt("palette", 0);
-        return Math.max(0, Math.min(userPaletteIndex(), p));
+        return Math.max(0, Math.min(paletteCount() - 1, p));
     }
 
+    /** Только переключает активную схему. Ничего никуда не копирует. */
     static void setPalette(Context c, int index) {
-        SharedPreferences p = get(c);
-        if (index == userPaletteIndex() && palette(c) != userPaletteIndex()) {
-            SharedPreferences.Editor e = p.edit();
-            for (int i = 0; i < BANDS; i++) e.putInt("user_" + i, color(c, i));
-            e.putInt("palette", index);
-            e.apply();
-        } else {
-            putInt(p, "palette", index);
-        }
+        int idx = Math.max(0, Math.min(paletteCount() - 1, index));
+        putInt(get(c), "palette", idx);
         bump();
     }
 
+    /** Цвет диапазона активной схемы. */
     static int color(Context c, int band) {
-        SharedPreferences p = get(c);
-        int idx = Math.max(0, Math.min(BANDS - 1, band));
-        if (palette(c) == userPaletteIndex()) {
-            return p.getInt("user_" + idx, PALETTES[0][idx]);
-        }
-        return PALETTES[palette(c)][idx];
+        return colorOf(c, palette(c), band);
     }
 
-    static void setUserColor(Context c, int band, int color) {
-        SharedPreferences p = get(c);
-        int idx = Math.max(0, Math.min(BANDS - 1, band));
-        if (palette(c) != userPaletteIndex()) {
-            SharedPreferences.Editor e = p.edit();
-            for (int i = 0; i < BANDS; i++) e.putInt("user_" + i, color(c, i));
-            e.putInt("palette", userPaletteIndex());
-            e.putInt("user_" + idx, color);
-            e.apply();
-        } else {
-            putInt(p, "user_" + idx, color);
-        }
+    /** Цвет диапазона любой схемы. */
+    static int colorOf(Context c, int paletteIndex, int band) {
+        int pal = clampPalette(paletteIndex);
+        int idx = clampBand(band);
+        return get(c).getInt(key(pal, idx), factory(pal, idx));
+    }
+
+    /** Записывает цвет в указанную схему. */
+    static void setColor(Context c, int paletteIndex, int band, int color) {
+        int pal = clampPalette(paletteIndex);
+        int idx = clampBand(band);
+        putInt(get(c), key(pal, idx), color);
         bump();
+    }
+
+    /** Правит активную схему. Старое имя метода сохранено. */
+    static void setUserColor(Context c, int band, int color) {
+        setColor(c, palette(c), band, color);
+    }
+
+    /** Отличается ли схема от заводского состояния. */
+    static boolean isModified(Context c, int paletteIndex) {
+        int pal = clampPalette(paletteIndex);
+        for (int b = 0; b < BANDS; b++) {
+            if (colorOf(c, pal, b) != factory(pal, b)) return true;
+        }
+        return false;
+    }
+
+    /** Возвращает схему к заводским цветам. Для Особой заводское = Стандарт. */
+    static void resetPalette(Context c, int paletteIndex) {
+        int pal = clampPalette(paletteIndex);
+        SharedPreferences.Editor e = get(c).edit();
+        for (int b = 0; b < BANDS; b++) e.putInt(key(pal, b), factory(pal, b));
+        e.apply();
+        bump();
+    }
+
+    /** Возвращает заводской цвет одного диапазона. */
+    static void resetBand(Context c, int paletteIndex, int band) {
+        int pal = clampPalette(paletteIndex);
+        int idx = clampBand(band);
+        putInt(get(c), key(pal, idx), factory(pal, idx));
+        bump();
+    }
+
+    /** Заводской цвет диапазона указанной схемы. */
+    static int factory(int paletteIndex, int band) {
+        int pal = clampPalette(paletteIndex);
+        int idx = clampBand(band);
+        return pal < PALETTES.length ? PALETTES[pal][idx] : PALETTES[0][idx];
+    }
+
+    private static int clampPalette(int p) {
+        return Math.max(0, Math.min(paletteCount() - 1, p));
+    }
+
+    private static int clampBand(int b) {
+        return Math.max(0, Math.min(BANDS - 1, b));
+    }
+
+    private static String key(int pal, int band) {
+        return "pal_" + pal + "_" + band;
+    }
+
+    /** Перенос настроек на новое хранение. Один раз, старые ключи не удаляются. */
+    private static void migrate(SharedPreferences p) {
+        if (p.getBoolean(MIGRATED, false)) return;
+        SharedPreferences.Editor e = p.edit();
+        for (int pal = 0; pal < PALETTES.length; pal++) {
+            for (int b = 0; b < BANDS; b++) e.putInt(key(pal, b), PALETTES[pal][b]);
+        }
+        for (int b = 0; b < BANDS; b++) {
+            e.putInt(key(userPaletteIndex(), b), p.getInt("user_" + b, PALETTES[0][b]));
+        }
+        e.putBoolean(MIGRATED, true);
+        e.apply();
     }
 
     static boolean soundEnabled(Context c) {
@@ -160,7 +222,13 @@ final class Prefs {
 
     /** Сбрасывает только настройки этого приложения. Системные разрешения не трогает. */
     static void reset(Context c) {
-        get(c).edit().clear().apply();
+        SharedPreferences.Editor e = get(c).edit();
+        e.clear();
+        for (int pal = 0; pal < paletteCount(); pal++) {
+            for (int b = 0; b < BANDS; b++) e.putInt(key(pal, b), factory(pal, b));
+        }
+        e.putBoolean(MIGRATED, true);
+        e.apply();
         bump();
     }
 
