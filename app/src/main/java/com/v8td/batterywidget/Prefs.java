@@ -108,6 +108,16 @@ final class Prefs {
         setColor(c, palette(c), band, color);
     }
 
+        /** Синий при зарядке. По умолчанию выключен. */
+    static boolean chargingBlue(Context c) {
+        return get(c).getBoolean("charging_blue", false);
+    }
+
+    static void setChargingBlue(Context c, boolean v) {
+        putBoolean(get(c), "charging_blue", v);
+        bump();
+    }
+
     /** Отличается ли схема от заводского состояния. */
     static boolean isModified(Context c, int paletteIndex) {
         int pal = clampPalette(paletteIndex);
