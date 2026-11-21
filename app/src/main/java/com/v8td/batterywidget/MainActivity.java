@@ -6,7 +6,10 @@ import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Insets;
+import android.graphics.Outline;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
@@ -15,9 +18,11 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -38,7 +43,7 @@ public final class MainActivity extends Activity {
     private Switch swSound, swChargingBlue, swLauncherIcon;
     private SeekBar seek;
     private LinearLayout palettePreview, systemBox;
-    private Button btnSoundPick, btnSystem;
+    private Button btnSoundPick, btnSystem, btnIconMode, btnOutline;
     private ImageButton btnSoundTest;
 
     @Override
@@ -96,7 +101,10 @@ public final class MainActivity extends Activity {
         systemBox = findViewById(R.id.system_box);
         btnSystem = findViewById(R.id.btn_system);
         swLauncherIcon = findViewById(R.id.sw_launcher_icon);
+        btnIconMode = findViewById(R.id.btn_icon_mode);
+        btnOutline = findViewById(R.id.btn_outline);
         subtitle.setText("Версия " + BuildConfig.VERSION_NAME + " · виджет 1×1");
+
         Button add = findViewById(R.id.btn_add);
         add.setOnClickListener(v -> {
             setResult(RESULT_OK, new Intent()
@@ -105,11 +113,16 @@ public final class MainActivity extends Activity {
             Scheduler.ensure(this);
             finish();
         });
+
         Button palette = findViewById(R.id.btn_palette);
         palette.setOnClickListener(v -> showPalettes());
         Button bands = findViewById(R.id.btn_bands);
         bands.setText("Цвета схемы");
         bands.setOnClickListener(v -> showBands(Prefs.palette(this)));
+
+        btnIconMode.setOnClickListener(v -> showIconModes());
+        btnOutline.setOnClickListener(v -> showOutlines());
+
         swChargingBlue = findViewById(R.id.sw_charging_blue);
         swChargingBlue.setOnCheckedChangeListener(null);
         swChargingBlue.setChecked(Prefs.chargingBlue(this));
@@ -117,12 +130,14 @@ public final class MainActivity extends Activity {
             Prefs.setChargingBlue(this, checked);
             refreshWidget();
         });
+
         swSound.setChecked(Prefs.soundEnabled(this));
         swSound.setOnCheckedChangeListener((b, checked) -> {
             Prefs.setSoundEnabled(this, checked);
             applySoundEnabled();
             refreshWidget();
         });
+
         seek.setMax(50);
         seek.setProgress(Prefs.threshold(this) - 50);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -140,14 +155,17 @@ public final class MainActivity extends Activity {
             public void onStopTrackingTouch(SeekBar s) {
             }
         });
+
         btnSoundPick.setOnClickListener(v -> pickSound());
         btnSoundTest.setOnClickListener(v -> App.exec(() -> SoundPlayer.play(this)));
+
         btnSystem.setOnClickListener(v -> {
             boolean show = systemBox.getVisibility() != View.VISIBLE;
             systemBox.setVisibility(show ? View.VISIBLE : View.GONE);
             updateSystemButton();
         });
         syncLauncherIcon();
+
         Button autostart = findViewById(R.id.btn_autostart);
         autostart.setOnClickListener(v -> SystemLinks.openAutostart(this));
         Button battery = findViewById(R.id.btn_battery);
@@ -218,6 +236,8 @@ public final class MainActivity extends Activity {
         });
         syncLauncherIcon();
         updateSystemButton();
+        updateLookButtons();
+
         palettePreview.removeAllViews();
         for (int i = 0; i < Prefs.BANDS; i++) {
             final int band = Prefs.BANDS - 1 - i;
@@ -240,6 +260,7 @@ public final class MainActivity extends Activity {
             lp.setMargins(dp(1), 0, dp(1), 0);
             palettePreview.addView(cell, lp);
         }
+
         BatteryState s = BatteryReader.read(this);
         boolean free = FirstRun.batteryUnrestricted(this);
         int active = Prefs.palette(this);
@@ -249,9 +270,12 @@ public final class MainActivity extends Activity {
         sb.append(s.charging ? " · зарядка подключена" : " · от батареи");
         sb.append("\nСхема: ").append(Prefs.PALETTE_NAMES[active]);
         if (Prefs.isModified(this, active)) sb.append(" · изменена");
+        sb.append("\nЗначок: ").append(Prefs.MODE_NAMES[Prefs.iconMode(this)]);
+        sb.append(" · обводка: ").append(Prefs.OUTLINE_NAMES[Prefs.outline(this)]);
         sb.append("\nОбновление: по событиям системы и при включении экрана");
         sb.append("\nОптимизация батареи: ").append(free ? "без ограничений" : "ограничена");
         status.setText(sb.toString());
+
         refreshSoundButton();
         refreshBackgroundStates();
         applySoundEnabled();
@@ -304,6 +328,187 @@ public final class MainActivity extends Activity {
         refreshWidget();
         refreshUi();
         Toast.makeText(this, "Схема собрана", Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateLookButtons() {
+        btnIconMode.setText(twoLine("Значок на виджете",
+                Prefs.MODE_NAMES[Prefs.iconMode(this)], getColor(R.color.muted)));
+        btnOutline.setText(twoLine("Обводка цифр",
+                Prefs.OUTLINE_NAMES[Prefs.outline(this)], getColor(R.color.muted)));
+    }
+
+    /** Превью рисуются тем же кодом, что и настоящий виджет. */
+    private Bitmap lookPreview(int px, int mode, int outline, int color, boolean charging) {
+        float density = getResources().getDisplayMetrics().density;
+        int[] res = WidgetRenderer.reserve(mode, px, px);
+        WidgetTextSizer.Size size = WidgetTextSizer.get(px, px, density, 1f, res[0], res[1]);
+        return WidgetRenderer.render(px, px, "88", color, size.twoDigits, charging, mode, outline);
+    }
+
+    private void roundCorners(ImageView iv, final float radiusPx) {
+        iv.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radiusPx);
+            }
+        });
+        iv.setClipToOutline(true);
+    }
+
+    private void showIconModes() {
+        final int current = Prefs.iconMode(this);
+        final int outline = Prefs.outline(this);
+        BatteryState st = BatteryReader.read(this);
+        final int color = st.valid
+                ? Prefs.color(this, BatteryState.band(st.percent))
+                : getColor(R.color.accent);
+        final int px = dp(48);
+
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(dp(16), dp(8), dp(16), dp(8));
+
+        TextView hint = new TextView(this);
+        hint.setText("Молния появляется только при зарядке, знак % виден всегда."
+                + " Превью показано с подключённой зарядкой. Под значки резервируется место,"
+                + " поэтому при подключении зарядки цифры не прыгают и не уменьшаются.");
+        hint.setTextSize(12);
+        hint.setTextColor(getColor(R.color.muted));
+        hint.setPadding(dp(4), 0, dp(4), dp(8));
+        list.addView(hint);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(list);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Значок на виджете")
+                .setView(scroll)
+                .setNegativeButton("Закрыть", null)
+                .create();
+
+        for (int i = 0; i < Prefs.MODES; i++) {
+            final int mode = i;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(4), dp(8), dp(4), dp(8));
+
+            ImageView preview = new ImageView(this);
+            preview.setImageBitmap(lookPreview(px, mode, outline, color, true));
+            preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(getColor(R.color.button));
+            bg.setStroke(dp(1), getColor(R.color.stroke));
+            preview.setBackground(bg);
+            roundCorners(preview, dp(8));
+            row.addView(preview, new LinearLayout.LayoutParams(px, px));
+
+            LinearLayout texts = new LinearLayout(this);
+            texts.setOrientation(LinearLayout.VERTICAL);
+            texts.setPadding(dp(12), 0, dp(8), 0);
+            TextView name = new TextView(this);
+            name.setText(Prefs.MODE_NAMES[i] + (i == current ? "  ✓" : ""));
+            name.setTextSize(15);
+            name.setTextColor(getColor(i == current ? R.color.accent : R.color.text));
+            if (i == current) name.setTypeface(Typeface.DEFAULT_BOLD);
+            texts.addView(name);
+            TextView desc = new TextView(this);
+            desc.setText(Prefs.MODE_HINTS[i]);
+            desc.setTextSize(11);
+            desc.setTextColor(getColor(R.color.muted));
+            texts.addView(desc);
+            row.addView(texts, new LinearLayout.LayoutParams(0, -2, 1f));
+
+            row.setOnClickListener(v -> {
+                Prefs.setIconMode(this, mode);
+                refreshWidget();
+                refreshUi();
+                dialog.dismiss();
+                Toast.makeText(this, Prefs.MODE_NAMES[mode], Toast.LENGTH_SHORT).show();
+            });
+            list.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        }
+        dialog.show();
+    }
+
+    private void showOutlines() {
+        final int current = Prefs.outline(this);
+        final int mode = Prefs.iconMode(this);
+        BatteryState st = BatteryReader.read(this);
+        final int color = st.valid
+                ? Prefs.color(this, BatteryState.band(st.percent))
+                : getColor(R.color.accent);
+        final int px = dp(48);
+
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(dp(16), dp(8), dp(16), dp(8));
+
+        TextView hint = new TextView(this);
+        hint.setText("Превью на светлой подложке — как на светлых обоях."
+                + " Оформление получает только текст: цифры и знак %."
+                + " К теме телефона не привязано.");
+        hint.setTextSize(12);
+        hint.setTextColor(getColor(R.color.muted));
+        hint.setPadding(dp(4), 0, dp(4), dp(8));
+        list.addView(hint);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(list);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Обводка цифр")
+                .setView(scroll)
+                .setNegativeButton("Закрыть", null)
+                .create();
+
+        String[] hints = {
+                "Как сейчас: только цвет цифр",
+                "Мягкий тёмный ореол вокруг цифр",
+                "Тонкая тёмная линия по краю цифр"
+        };
+        for (int i = 0; i < Prefs.OUTLINE_NAMES.length; i++) {
+            final int style = i;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(4), dp(8), dp(4), dp(8));
+
+            ImageView preview = new ImageView(this);
+            preview.setImageBitmap(lookPreview(px, mode, style, color, true));
+            preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(0xFFF3F5F8);
+            bg.setStroke(dp(1), getColor(R.color.stroke));
+            preview.setBackground(bg);
+            roundCorners(preview, dp(8));
+            row.addView(preview, new LinearLayout.LayoutParams(px, px));
+
+            LinearLayout texts = new LinearLayout(this);
+            texts.setOrientation(LinearLayout.VERTICAL);
+            texts.setPadding(dp(12), 0, dp(8), 0);
+            TextView name = new TextView(this);
+            name.setText(Prefs.OUTLINE_NAMES[i] + (i == current ? "  ✓" : ""));
+            name.setTextSize(15);
+            name.setTextColor(getColor(i == current ? R.color.accent : R.color.text));
+            if (i == current) name.setTypeface(Typeface.DEFAULT_BOLD);
+            texts.addView(name);
+            TextView desc = new TextView(this);
+            desc.setText(hints[i]);
+            desc.setTextSize(11);
+            desc.setTextColor(getColor(R.color.muted));
+            texts.addView(desc);
+            row.addView(texts, new LinearLayout.LayoutParams(0, -2, 1f));
+
+            row.setOnClickListener(v -> {
+                Prefs.setOutline(this, style);
+                refreshWidget();
+                refreshUi();
+                dialog.dismiss();
+                Toast.makeText(this, "Обводка: " + Prefs.OUTLINE_NAMES[style],
+                        Toast.LENGTH_SHORT).show();
+            });
+            list.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        }
+        dialog.show();
     }
 
     private void showPalettes() {
@@ -562,6 +767,7 @@ public final class MainActivity extends Activity {
                 .setTitle("Q-battery " + BuildConfig.VERSION_NAME)
                 .setMessage("Виджет заряда 1×1. Прозрачный фон, крупные цифры, одинаковый размер "
                         + "для всех значений 0–99 и отдельный для 100.\n\n"
+                        + "Значки и обводка цифр настраиваются в разделе «Значки и читаемость».\n\n"
                         + "Без интернета, без рекламы, без постоянного уведомления.\n\n"
                         + "Удаление: Настройки Android → Приложения → Q-battery → Удалить.")
                 .setPositiveButton("Настройки приложения", (d, w) -> SystemLinks.openAppDetails(this))
@@ -573,8 +779,9 @@ public final class MainActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle("Сбросить настройки?")
                 .setMessage("Все схемы вернутся к заводским цветам, «Арлекин» — к своей мозаике. "
-                        + "Параметры звука сбросятся. Виджет останется на месте, системные "
-                        + "разрешения, автозапуск и значок приложения не изменятся.")
+                        + "Параметры звука сбросятся. Значок на виджете вернётся к «Только цифры», "
+                        + "обводка выключится. Виджет останется на месте, системные разрешения, "
+                        + "автозапуск и значок приложения не изменятся.")
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Сбросить", (d, w) -> {
                     Prefs.reset(this);
