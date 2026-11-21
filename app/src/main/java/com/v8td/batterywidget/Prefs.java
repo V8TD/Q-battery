@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 
 /** Единственное хранилище настроек приложения. */
 final class Prefs {
+
     static final String FILE = "q_battery_prefs";
     static final int BANDS = 10;
     static final int DEFAULT_THRESHOLD = 100;
@@ -19,13 +20,13 @@ final class Prefs {
     /** Заводские цвета. Порядок: от 91–100% вниз до 0–10%. */
     static final int[][] PALETTES = {
             {0xFF2ECC71, 0xFF57D06A, 0xFF8BD450, 0xFFC9D63F, 0xFFFFD23F,
-             0xFFFFB03A, 0xFFFF8A34, 0xFFFF6B35, 0xFFF0453A, 0xFFD32F2F},
+                    0xFFFFB03A, 0xFFFF8A34, 0xFFFF6B35, 0xFFF0453A, 0xFFD32F2F},
             {0xFF2EFF2E, 0xFF27C927, 0xFF76FF03, 0xFFC6FF00, 0xFFFFEA00,
-             0xFFFFC400, 0xFFFF9100, 0xFFFF3D00, 0xFFFF1744, 0xFFC41212},
+                    0xFFFFC400, 0xFFFF9100, 0xFFFF3D00, 0xFFFF1744, 0xFFC41212},
             {0xFFA5D6A7, 0xFFB9E0A5, 0xFFD7E8A8, 0xFFF3E9A9, 0xFFFFE0B2,
-             0xFFFFCCBC, 0xFFFFAB91, 0xFFEF9A9A, 0xFFE5989B, 0xFFCE93D8},
+                    0xFFFFCCBC, 0xFFFFAB91, 0xFFEF9A9A, 0xFFE5989B, 0xFFCE93D8},
             {0xFF00806A, 0xFF1B8A3A, 0xFF4C8C1E, 0xFF7D8A0A, 0xFF9A7B00,
-             0xFFB26A00, 0xFFC05500, 0xFFC62828, 0xFFA01020, 0xFF7A0A18}
+                    0xFFB26A00, 0xFFC05500, 0xFFC62828, 0xFFA01020, 0xFF7A0A18}
     };
 
     /** Арлекин: мозаика несочетаемых цветов. Порядок тот же. */
@@ -38,6 +39,32 @@ final class Prefs {
             "91–100%", "81–90%", "71–80%", "61–70%", "51–60%",
             "41–50%", "31–40%", "21–30%", "11–20%", "0–10%"
     };
+
+    /** Режимы значков на виджете. Индекс совпадает с порядком в списке настроек. */
+    static final int MODES = 8;
+    static final String[] MODE_NAMES = {
+            "Только цифры",
+            "Молния вверху справа",
+            "Молния внизу по центру",
+            "Процент вверху справа",
+            "Процент внизу по центру",
+            "Процент вверху, молния внизу",
+            "Процент внизу, молния вверху",
+            "Молния позади цифр"
+    };
+    static final String[] MODE_HINTS = {
+            "Ничего лишнего, цифры максимального размера",
+            "Молния только при зарядке, в углу",
+            "Молния только при зарядке, под цифрами",
+            "Знак % виден всегда",
+            "Знак % виден всегда, под цифрами",
+            "% вверху справа, молния внизу по центру",
+            "% внизу по центру, молния вверху справа",
+            "Большая полупрозрачная молния только при зарядке"
+    };
+
+    /** Оформление цифр: 0 — нет, 1 — тень, 2 — тонкий контур. */
+    static final String[] OUTLINE_NAMES = {"Нет", "Тень", "Тонкий контур"};
 
     private static final String MIGRATED = "palettes_v2";
 
@@ -121,6 +148,28 @@ final class Prefs {
 
     static void setChargingBlue(Context c, boolean v) {
         putBoolean(get(c), "charging_blue", v);
+        bump();
+    }
+
+    /** Режим значков. По умолчанию 0 — только цифры. */
+    static int iconMode(Context c) {
+        int m = get(c).getInt("icon_mode", 0);
+        return Math.max(0, Math.min(MODES - 1, m));
+    }
+
+    static void setIconMode(Context c, int mode) {
+        putInt(get(c), "icon_mode", Math.max(0, Math.min(MODES - 1, mode)));
+        bump();
+    }
+
+    /** Обводка цифр. По умолчанию 0 — нет. */
+    static int outline(Context c) {
+        int o = get(c).getInt("outline_style", 0);
+        return Math.max(0, Math.min(OUTLINE_NAMES.length - 1, o));
+    }
+
+    static void setOutline(Context c, int style) {
+        putInt(get(c), "outline_style", Math.max(0, Math.min(OUTLINE_NAMES.length - 1, style)));
         bump();
     }
 
