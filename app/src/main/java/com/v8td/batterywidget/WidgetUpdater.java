@@ -14,6 +14,7 @@ import java.util.HashMap;
 
 /** Единственная точка обновления всех экземпляров виджета. */
 final class WidgetUpdater {
+
     private static final HashMap<Integer, String> LAST = new HashMap<>();
     private static final int FALLBACK_DP = 56;
     private static final int MAX_PX = 512;
@@ -39,41 +40,44 @@ final class WidgetUpdater {
                 Scheduler.cancel(app);
                 return;
             }
-
             BatteryState state = BatteryReader.read(app);
             if (!state.valid) {
                 Scheduler.ensure(app);
                 return;
             }
-
             ChargeAlert.onState(app, state);
-
             int color = (state.charging && Prefs.chargingBlue(app))
                     ? Prefs.CHARGING_COLOR
                     : Prefs.color(app, BatteryState.band(state.percent));
             int revision = Prefs.revision();
-
+            int mode = Prefs.iconMode(app);
+            int outline = Prefs.outline(app);
             DisplayMetrics metrics = app.getResources().getDisplayMetrics();
             float density = metrics.density > 0 ? metrics.density : 1f;
             float fontScale = app.getResources().getConfiguration().fontScale;
             if (fontScale <= 0f) fontScale = 1f;
-
             PendingIntent click = clickIntent(app);
 
             for (int id : ids) {
                 try {
                     int[] wh = geometry(app, manager, id, density);
                     String signature = state.percent + "|" + state.charging + "|" + color
-                            + "|" + revision + "|" + wh[0] + "x" + wh[1];
+                            + "|" + revision + "|" + mode + "|" + outline
+                            + "|" + wh[0] + "x" + wh[1];
                     if (!force && signature.equals(LAST.get(id))) continue;
 
-                    WidgetTextSizer.Size size = WidgetTextSizer.get(wh[0], wh[1], density, fontScale);
+                    int[] res = WidgetRenderer.reserve(mode, wh[0], wh[1]);
+                    WidgetTextSizer.Size size = WidgetTextSizer.get(
+                            wh[0], wh[1], density, fontScale, res[0], res[1]);
                     float textSize = state.percent == 100 ? size.threeDigits : size.twoDigits;
-                    Bitmap bitmap = WidgetRenderer.render(wh[0], wh[1], state.percent, color, textSize);
+                    Bitmap bitmap = WidgetRenderer.render(wh[0], wh[1], state.percent, color,
+                            textSize, state.charging, mode, outline);
 
                     RemoteViews views = new RemoteViews(app.getPackageName(), R.layout.widget_battery);
                     views.setImageViewBitmap(R.id.widget_digits, bitmap);
-                    views.setContentDescription(R.id.widget_digits, "Заряд " + state.percent + "%");
+                    views.setContentDescription(R.id.widget_digits,
+                            "Заряд " + state.percent + "%"
+                                    + (state.charging ? ", зарядка" : ""));
                     views.setOnClickPendingIntent(R.id.widget_root, click);
                     manager.updateAppWidget(id, views);
                     LAST.put(id, signature);
