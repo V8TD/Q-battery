@@ -12,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- Настройки открываются тапом по виджету. -->
+        <!-- Настройки открываются тапом по виджету и по значку. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -20,11 +20,11 @@
             android:launchMode="singleTop"
             android:label="@string/widget_label" />
 
-        <!-- Значок в списке приложений: выключен по умолчанию, включается в настройках. -->
+        <!-- Значок в списке приложений: включён по умолчанию, гасится галочкой. -->
         <activity-alias
             android:name=".LauncherAlias"
             android:targetActivity=".MainActivity"
-            android:enabled="false"
+            android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name">
