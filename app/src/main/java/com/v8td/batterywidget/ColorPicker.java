@@ -26,6 +26,8 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewOutlineProvider;
+import android.view.Window;
+import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
@@ -277,7 +279,7 @@ final class ColorPicker {
         groupLabel.setPadding(0, dpPx(a, 14), 0, dpPx(a, 4));
         groupLabel.setText(GROUP_NAMES[vg[0]]);
 
-        // --- 4. Кнопки стилей. ---
+        // --- 4. Кнопки стилей: одна строка, шрифт сам подбирается под ширину. ---
         LinearLayout stylesRow = new LinearLayout(a);
         stylesRow.setOrientation(LinearLayout.HORIZONTAL);
         Button[] styleBtns = new Button[STYLE_NAMES.length];
@@ -285,10 +287,11 @@ final class ColorPicker {
             Button b = new Button(a);
             b.setText(STYLE_NAMES[i]);
             b.setAllCaps(false);
-            b.setTextSize(13);
+            b.setSingleLine(true);
             b.setMinWidth(0);
             b.setMinimumWidth(0);
-            b.setPadding(dpPx(a, 4), 0, dpPx(a, 4), 0);
+            b.setPadding(dpPx(a, 6), 0, dpPx(a, 6), 0);
+            b.setAutoSizeTextTypeUniformWithConfiguration(9, 13, 1, TypedValue.COMPLEX_UNIT_SP);
             LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(0, dpPx(a, 44), 1f);
             blp.setMargins(dpPx(a, 2), dpPx(a, 2), dpPx(a, 2), dpPx(a, 2));
             stylesRow.addView(b, blp);
@@ -539,19 +542,28 @@ final class ColorPicker {
 
         scroll.addView(box);
 
-        new AlertDialog.Builder(a)
+        AlertDialog dialog = new AlertDialog.Builder(a)
                 .setTitle("Цвет")
                 .setView(scroll)
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Сохранить", (d, w) -> callback.onColor(cur[0]))
-                .show();
+                .create();
 
-        // Автопрокрутка к строке выбранного (или ближайшего) цвета.
-        scroll.post(() -> {
-            int[] n = lastNear[0];
-            int y = table.getTop() + n[3] * table.rowHeight() - scroll.getHeight() / 2;
-            scroll.scrollTo(0, Math.max(0, y));
+        // Окно шире системного умолчания: почти вся ширина экрана.
+        // После расширения — автопрокрутка к строке выбранного цвета.
+        dialog.setOnShowListener(d -> {
+            Window win = dialog.getWindow();
+            if (win != null) {
+                int screenW = a.getResources().getDisplayMetrics().widthPixels;
+                win.setLayout(screenW - dpPx(a, 24), WindowManager.LayoutParams.WRAP_CONTENT);
+            }
+            scroll.post(() -> scroll.post(() -> {
+                int[] n = lastNear[0];
+                int y = table.getTop() + n[3] * table.rowHeight() - scroll.getHeight() / 2;
+                scroll.scrollTo(0, Math.max(0, y));
+            }));
         });
+        dialog.show();
     }
 
     private static Button smallButton(Activity a, String text) {
