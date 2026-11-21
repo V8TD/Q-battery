@@ -129,6 +129,18 @@
                 android:textColor="@color/text"
                 android:textSize="15sp" />
 
+            <TextView style="@style/Section" android:text="Значки и читаемость" />
+
+            <Button
+                android:id="@+id/btn_icon_mode"
+                style="@style/Btn"
+                android:text="Значок на виджете" />
+
+            <Button
+                android:id="@+id/btn_outline"
+                style="@style/Btn"
+                android:text="Обводка цифр" />
+
             <TextView style="@style/Section" android:text="Сигнал о зарядке" />
 
             <Switch
@@ -217,10 +229,8 @@
 
                 <Button android:id="@+id/btn_autostart" style="@style/Btn"
                     android:text="Автозапуск" />
-
                 <Button android:id="@+id/btn_battery" style="@style/Btn"
                     android:text="Экономия заряда" />
-
                 <Button android:id="@+id/btn_appinfo" style="@style/Btn"
                     android:text="Системные настройки приложения" />
             </LinearLayout>
@@ -232,7 +242,6 @@
 
             <Button android:id="@+id/btn_about" style="@style/Btn"
                 android:text="Информация и удаление" />
-
             <Button android:id="@+id/btn_reset" style="@style/Btn"
                 android:text="Сбросить настройки" />
 
