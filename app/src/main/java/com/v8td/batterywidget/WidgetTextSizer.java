@@ -9,8 +9,6 @@ import java.util.Map;
 /**
  * Единый размер цифр для всего диапазона 0–99 и отдельный размер для 100.
  * Ширина измеряется реально, по всем ста комбинациям, высота — по FontMetrics.
- * Сверху и снизу могут резервироваться полосы под значки: размер цифр
- * зависит только от выбранного режима, но не от того, идёт ли зарядка.
  */
 final class WidgetTextSizer {
 
@@ -47,22 +45,15 @@ final class WidgetTextSizer {
         return FONT;
     }
 
-    /** Без резерва под значки. */
-    static Size get(int widthPx, int heightPx, float density, float fontScale) {
-        return get(widthPx, heightPx, density, fontScale, 0, 0);
-    }
-
-    static synchronized Size get(int widthPx, int heightPx, float density, float fontScale,
-                                 int reserveTopPx, int reserveBottomPx) {
-        String key = widthPx + "x" + heightPx + "|" + density + "|" + fontScale
-                + "|" + reserveTopPx + "|" + reserveBottomPx;
+    static synchronized Size get(int widthPx, int heightPx, float density, float fontScale) {
+        String key = widthPx + "x" + heightPx + "|" + density + "|" + fontScale;
         Size cached = CACHE.get(key);
         if (cached != null) return cached;
 
         int pad = Math.max(Math.round(2f * density),
                 Math.round(Math.min(widthPx, heightPx) * 0.04f));
         int availW = Math.max(4, widthPx - pad * 2);
-        int availH = Math.max(4, heightPx - pad * 2 - reserveTopPx - reserveBottomPx);
+        int availH = Math.max(4, heightPx - pad * 2);
 
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setTypeface(FONT);
