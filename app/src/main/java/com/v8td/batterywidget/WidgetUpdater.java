@@ -50,8 +50,6 @@ final class WidgetUpdater {
                     ? Prefs.CHARGING_COLOR
                     : Prefs.color(app, BatteryState.band(state.percent));
             int revision = Prefs.revision();
-            int mode = Prefs.iconMode(app);
-            int outline = Prefs.outline(app);
             DisplayMetrics metrics = app.getResources().getDisplayMetrics();
             float density = metrics.density > 0 ? metrics.density : 1f;
             float fontScale = app.getResources().getConfiguration().fontScale;
@@ -62,22 +60,16 @@ final class WidgetUpdater {
                 try {
                     int[] wh = geometry(app, manager, id, density);
                     String signature = state.percent + "|" + state.charging + "|" + color
-                            + "|" + revision + "|" + mode + "|" + outline
-                            + "|" + wh[0] + "x" + wh[1];
+                            + "|" + revision + "|" + wh[0] + "x" + wh[1];
                     if (!force && signature.equals(LAST.get(id))) continue;
 
-                    int[] res = WidgetRenderer.reserve(mode, wh[0], wh[1]);
-                    WidgetTextSizer.Size size = WidgetTextSizer.get(
-                            wh[0], wh[1], density, fontScale, res[0], res[1]);
+                    WidgetTextSizer.Size size = WidgetTextSizer.get(wh[0], wh[1], density, fontScale);
                     float textSize = state.percent == 100 ? size.threeDigits : size.twoDigits;
-                    Bitmap bitmap = WidgetRenderer.render(wh[0], wh[1], state.percent, color,
-                            textSize, state.charging, mode, outline);
+                    Bitmap bitmap = WidgetRenderer.render(wh[0], wh[1], state.percent, color, textSize);
 
                     RemoteViews views = new RemoteViews(app.getPackageName(), R.layout.widget_battery);
                     views.setImageViewBitmap(R.id.widget_digits, bitmap);
-                    views.setContentDescription(R.id.widget_digits,
-                            "Заряд " + state.percent + "%"
-                                    + (state.charging ? ", зарядка" : ""));
+                    views.setContentDescription(R.id.widget_digits, "Заряд " + state.percent + "%");
                     views.setOnClickPendingIntent(R.id.widget_root, click);
                     manager.updateAppWidget(id, views);
                     LAST.put(id, signature);
