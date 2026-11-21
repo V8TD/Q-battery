@@ -26,8 +26,6 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewOutlineProvider;
-import android.view.Window;
-import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
@@ -41,7 +39,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** Редактор цвета (0.7): превью с HEX внутри, проверка читаемости на подложке,
- *  квадраты групп, стили и таблица 7×30 (210 оттенков на стиль, 5880 цветов всего). */
+ *  квадраты групп, стили и таблица 7×30 (210 оттенков на стиль, 5880 цветов всего).
+ *  Метрики блоков групп/стилей/таблицы взяты из проверенного окна 0.6. */
 final class ColorPicker {
 
     interface Callback {
@@ -175,7 +174,8 @@ final class ColorPicker {
 
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dpPx(a, 20), dpPx(a, 10), dpPx(a, 20), dpPx(a, 12));
+        // Отступы как в проверенном окне 0.6: 12dp по бокам.
+        box.setPadding(dpPx(a, 12), dpPx(a, 8), dpPx(a, 12), dpPx(a, 8));
 
         ScrollView scroll = new ScrollView(a);
 
@@ -267,7 +267,7 @@ final class ColorPicker {
         for (int i = 0; i < chips.length; i++) {
             View chip = new SquareView(a);
             LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, -2, 1f);
-            clp.setMargins(dpPx(a, 2), dpPx(a, 2), dpPx(a, 2), dpPx(a, 2));
+            clp.setMargins(dpPx(a, 2), dpPx(a, 3), dpPx(a, 2), dpPx(a, 3));
             chipsRow.addView(chip, clp);
             chips[i] = chip;
         }
@@ -276,10 +276,10 @@ final class ColorPicker {
         TextView groupLabel = new TextView(a);
         groupLabel.setTextSize(13);
         groupLabel.setTextColor(a.getColor(R.color.muted));
-        groupLabel.setPadding(0, dpPx(a, 14), 0, dpPx(a, 4));
+        groupLabel.setPadding(0, dpPx(a, 8), 0, dpPx(a, 4));
         groupLabel.setText(GROUP_NAMES[vg[0]]);
 
-        // --- 4. Кнопки стилей: одна строка, шрифт сам подбирается под ширину. ---
+        // --- 4. Кнопки стилей: метрики один в один из окна 0.6. ---
         LinearLayout stylesRow = new LinearLayout(a);
         stylesRow.setOrientation(LinearLayout.HORIZONTAL);
         Button[] styleBtns = new Button[STYLE_NAMES.length];
@@ -287,12 +287,11 @@ final class ColorPicker {
             Button b = new Button(a);
             b.setText(STYLE_NAMES[i]);
             b.setAllCaps(false);
-            b.setSingleLine(true);
+            b.setTextSize(11);
             b.setMinWidth(0);
             b.setMinimumWidth(0);
-            b.setPadding(dpPx(a, 6), 0, dpPx(a, 6), 0);
-            b.setAutoSizeTextTypeUniformWithConfiguration(9, 13, 1, TypedValue.COMPLEX_UNIT_SP);
-            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(0, dpPx(a, 44), 1f);
+            b.setPadding(0, 0, 0, 0);
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(0, dpPx(a, 36), 1f);
             blp.setMargins(dpPx(a, 2), dpPx(a, 2), dpPx(a, 2), dpPx(a, 2));
             stylesRow.addView(b, blp);
             styleBtns[i] = b;
@@ -317,9 +316,8 @@ final class ColorPicker {
                 GradientDrawable shape = new GradientDrawable();
                 shape.setColor(Color.HSVToColor(new float[]{GROUP_HUES[i], 0.88f, 0.92f}));
                 shape.setCornerRadius(dpPx(a, 6));
-                if (i == vg[0]) {
-                    shape.setStroke(dpPx(a, 3), a.getColor(R.color.accent));
-                }
+                shape.setStroke(dpPx(a, i == vg[0] ? 3 : 1),
+                        i == vg[0] ? a.getColor(R.color.accent) : 0x66889099);
                 chips[i].setBackground(shape);
                 chips[i].setContentDescription(GROUP_NAMES[i]);
             }
@@ -329,14 +327,13 @@ final class ColorPicker {
         final Runnable[] drawStyles = new Runnable[1];
         drawStyles[0] = () -> {
             for (int i = 0; i < styleBtns.length; i++) {
-                boolean sel = i == vs[0];
                 Button b = styleBtns[i];
-                b.setTextColor(a.getColor(sel ? R.color.text : R.color.muted));
+                b.setTextColor(a.getColor(R.color.text));
                 GradientDrawable bg = new GradientDrawable();
                 bg.setColor(a.getColor(R.color.button));
-                bg.setCornerRadius(dpPx(a, 10));
-                bg.setStroke(dpPx(a, sel ? 2 : 1),
-                        sel ? a.getColor(R.color.accent) : a.getColor(R.color.stroke));
+                bg.setCornerRadius(dpPx(a, 8));
+                bg.setStroke(dpPx(a, i == vs[0] ? 2 : 1),
+                        i == vs[0] ? a.getColor(R.color.accent) : a.getColor(R.color.stroke));
                 b.setBackground(bg);
             }
         };
@@ -542,28 +539,19 @@ final class ColorPicker {
 
         scroll.addView(box);
 
-        AlertDialog dialog = new AlertDialog.Builder(a)
+        new AlertDialog.Builder(a)
                 .setTitle("Цвет")
                 .setView(scroll)
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Сохранить", (d, w) -> callback.onColor(cur[0]))
-                .create();
+                .show();
 
-        // Окно шире системного умолчания: почти вся ширина экрана.
-        // После расширения — автопрокрутка к строке выбранного цвета.
-        dialog.setOnShowListener(d -> {
-            Window win = dialog.getWindow();
-            if (win != null) {
-                int screenW = a.getResources().getDisplayMetrics().widthPixels;
-                win.setLayout(screenW - dpPx(a, 24), WindowManager.LayoutParams.WRAP_CONTENT);
-            }
-            scroll.post(() -> scroll.post(() -> {
-                int[] n = lastNear[0];
-                int y = table.getTop() + n[3] * table.rowHeight() - scroll.getHeight() / 2;
-                scroll.scrollTo(0, Math.max(0, y));
-            }));
+        // Автопрокрутка к строке выбранного (или ближайшего) цвета.
+        scroll.post(() -> {
+            int[] n = lastNear[0];
+            int y = table.getTop() + n[3] * table.rowHeight() - scroll.getHeight() / 2;
+            scroll.scrollTo(0, Math.max(0, y));
         });
-        dialog.show();
     }
 
     private static Button smallButton(Activity a, String text) {
@@ -583,7 +571,7 @@ final class ColorPicker {
         t.setText(text);
         t.setTextSize(13);
         t.setTextColor(a.getColor(R.color.muted));
-        t.setPadding(0, dpPx(a, 14), 0, dpPx(a, 4));
+        t.setPadding(0, dpPx(a, 8), 0, dpPx(a, 4));
         return t;
     }
 
@@ -609,7 +597,7 @@ final class ColorPicker {
         return Math.round(value * c.getResources().getDisplayMetrics().density);
     }
 
-    /** Квадратная кнопка: высота всегда равна ширине, как на эталонном скриншоте. */
+    /** Квадратная кнопка: высота всегда равна ширине. */
     private static final class SquareView extends View {
         SquareView(Context c) {
             super(c);
@@ -630,6 +618,7 @@ final class ColorPicker {
         }
 
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF rect = new RectF();
         private final int cellH;
@@ -645,6 +634,9 @@ final class ColorPicker {
         ShadeTable(Context c) {
             super(c);
             cellH = dpPx(c, 30);
+            edge.setStyle(Paint.Style.STROKE);
+            edge.setStrokeWidth(dpPx(c, 1));
+            edge.setColor(0x55889099);
             ring.setStyle(Paint.Style.STROKE);
         }
 
@@ -686,7 +678,7 @@ final class ColorPicker {
         protected void onDraw(Canvas cv) {
             Context c = getContext();
             float gap = dpPx(c, 2);
-            float radius = dpPx(c, 5);
+            float radius = dpPx(c, 4);
             float cw = getWidth() / (float) COLS;
             for (int row = 0; row < ROWS; row++) {
                 for (int col = 0; col < COLS; col++) {
@@ -694,6 +686,7 @@ final class ColorPicker {
                     rect.set(col * cw + gap, row * cellH + gap,
                             (col + 1) * cw - gap, (row + 1) * cellH - gap);
                     cv.drawRoundRect(rect, radius, radius, fill);
+                    cv.drawRoundRect(rect, radius, radius, edge);
                 }
             }
             if (markCol >= 0 && markRow >= 0) {
