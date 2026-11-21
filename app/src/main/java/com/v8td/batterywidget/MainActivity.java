@@ -26,6 +26,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public final class MainActivity extends Activity {
+
     private static final int REQ_SOUND = 4107;
     private static final String ALIAS = "com.v8td.batterywidget.LauncherAlias";
     private static final String[] SCALE_LABELS =
@@ -96,7 +97,6 @@ public final class MainActivity extends Activity {
         btnSystem = findViewById(R.id.btn_system);
         swLauncherIcon = findViewById(R.id.sw_launcher_icon);
         subtitle.setText("Версия " + BuildConfig.VERSION_NAME + " · виджет 1×1");
-
         Button add = findViewById(R.id.btn_add);
         add.setOnClickListener(v -> {
             setResult(RESULT_OK, new Intent()
@@ -105,14 +105,11 @@ public final class MainActivity extends Activity {
             Scheduler.ensure(this);
             finish();
         });
-
         Button palette = findViewById(R.id.btn_palette);
         palette.setOnClickListener(v -> showPalettes());
-
         Button bands = findViewById(R.id.btn_bands);
         bands.setText("Цвета схемы");
         bands.setOnClickListener(v -> showBands(Prefs.palette(this)));
-
         swChargingBlue = findViewById(R.id.sw_charging_blue);
         swChargingBlue.setOnCheckedChangeListener(null);
         swChargingBlue.setChecked(Prefs.chargingBlue(this));
@@ -120,14 +117,12 @@ public final class MainActivity extends Activity {
             Prefs.setChargingBlue(this, checked);
             refreshWidget();
         });
-
         swSound.setChecked(Prefs.soundEnabled(this));
         swSound.setOnCheckedChangeListener((b, checked) -> {
             Prefs.setSoundEnabled(this, checked);
             applySoundEnabled();
             refreshWidget();
         });
-
         seek.setMax(50);
         seek.setProgress(Prefs.threshold(this) - 50);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -145,17 +140,14 @@ public final class MainActivity extends Activity {
             public void onStopTrackingTouch(SeekBar s) {
             }
         });
-
         btnSoundPick.setOnClickListener(v -> pickSound());
         btnSoundTest.setOnClickListener(v -> App.exec(() -> SoundPlayer.play(this)));
-
         btnSystem.setOnClickListener(v -> {
             boolean show = systemBox.getVisibility() != View.VISIBLE;
             systemBox.setVisibility(show ? View.VISIBLE : View.GONE);
             updateSystemButton();
         });
         syncLauncherIcon();
-
         Button autostart = findViewById(R.id.btn_autostart);
         autostart.setOnClickListener(v -> SystemLinks.openAutostart(this));
         Button battery = findViewById(R.id.btn_battery);
@@ -226,7 +218,6 @@ public final class MainActivity extends Activity {
         });
         syncLauncherIcon();
         updateSystemButton();
-
         palettePreview.removeAllViews();
         for (int i = 0; i < Prefs.BANDS; i++) {
             final int band = Prefs.BANDS - 1 - i;
@@ -249,7 +240,6 @@ public final class MainActivity extends Activity {
             lp.setMargins(dp(1), 0, dp(1), 0);
             palettePreview.addView(cell, lp);
         }
-
         BatteryState s = BatteryReader.read(this);
         boolean free = FirstRun.batteryUnrestricted(this);
         int active = Prefs.palette(this);
@@ -262,7 +252,6 @@ public final class MainActivity extends Activity {
         sb.append("\nОбновление: по событиям системы и при включении экрана");
         sb.append("\nОптимизация батареи: ").append(free ? "без ограничений" : "ограничена");
         status.setText(sb.toString());
-
         refreshSoundButton();
         refreshBackgroundStates();
         applySoundEnabled();
@@ -295,25 +284,38 @@ public final class MainActivity extends Activity {
     }
 
     private void openBandEditor(int band) {
-        ColorPicker.open(this, Prefs.BAND_NAMES[band], Prefs.color(this, band), color -> {
-            Prefs.setColor(this, Prefs.palette(this), band, color);
-            refreshWidget();
-            refreshUi();
-        });
+        final int pal = Prefs.palette(this);
+        ColorPicker.open(this, Prefs.BAND_NAMES[band], Prefs.color(this, band),
+                pal, band,
+                color -> {
+                    Prefs.setColor(this, pal, band, color);
+                    refreshWidget();
+                    refreshUi();
+                },
+                pal == Prefs.userPaletteIndex() ? null : colors -> applyScheme(pal, colors));
+    }
+
+    /** Записывает готовую схему генератора во все 10 диапазонов. */
+    private void applyScheme(int pal, int[] colors) {
+        for (int b = 0; b < Prefs.BANDS; b++) {
+            Prefs.setColor(this, pal, b, colors[b]);
+        }
+        WidgetUpdater.forget();
+        refreshWidget();
+        refreshUi();
+        Toast.makeText(this, "Схема собрана", Toast.LENGTH_SHORT).show();
     }
 
     private void showPalettes() {
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         list.setPadding(dp(16), dp(8), dp(16), dp(8));
-
         TextView hint = new TextView(this);
         hint.setText("Нажми на схему — сделать её активной. Любую схему можно настроить и сбросить.");
         hint.setTextSize(12);
         hint.setTextColor(getColor(R.color.muted));
         hint.setPadding(dp(6), 0, dp(6), dp(8));
         list.addView(hint);
-
         ScrollView scroll = new ScrollView(this);
         scroll.addView(list);
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -321,13 +323,11 @@ public final class MainActivity extends Activity {
                 .setView(scroll)
                 .setNegativeButton("Закрыть", null)
                 .create();
-
         for (int i = 0; i < Prefs.paletteCount(); i++) {
             final int index = i;
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
             row.setPadding(dp(6), dp(10), dp(6), dp(10));
-
             TextView name = new TextView(this);
             String title = Prefs.PALETTE_NAMES[i];
             if (Prefs.palette(this) == i) title += "  ✓";
@@ -336,7 +336,6 @@ public final class MainActivity extends Activity {
             name.setTextSize(16);
             name.setTextColor(getColor(R.color.text));
             row.addView(name);
-
             LinearLayout chips = new LinearLayout(this);
             chips.setOrientation(LinearLayout.HORIZONTAL);
             chips.setPadding(0, dp(6), 0, 0);
@@ -352,7 +351,6 @@ public final class MainActivity extends Activity {
                 chips.addView(chip, lp);
             }
             row.addView(chips);
-
             row.setOnClickListener(v -> {
                 Prefs.setPalette(this, index);
                 refreshWidget();
@@ -360,11 +358,9 @@ public final class MainActivity extends Activity {
                 dialog.dismiss();
                 Toast.makeText(this, Prefs.PALETTE_NAMES[index], Toast.LENGTH_SHORT).show();
             });
-
             LinearLayout actions = new LinearLayout(this);
             actions.setOrientation(LinearLayout.HORIZONTAL);
             actions.setPadding(0, dp(6), 0, 0);
-
             TextView edit = new TextView(this);
             edit.setText("Настроить");
             edit.setTextSize(13);
@@ -375,7 +371,6 @@ public final class MainActivity extends Activity {
                 showBands(index);
             });
             actions.addView(edit);
-
             TextView reset = new TextView(this);
             reset.setText("Сбросить");
             reset.setTextSize(13);
@@ -386,7 +381,6 @@ public final class MainActivity extends Activity {
                 confirmResetPalette(index);
             });
             actions.addView(reset);
-
             row.addView(actions);
             list.addView(row);
         }
@@ -398,7 +392,6 @@ public final class MainActivity extends Activity {
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         list.setPadding(dp(16), dp(8), dp(16), dp(8));
-
         TextView hint = new TextView(this);
         String hintText = "Нажми — изменить цвет. Долгое нажатие — вернуть заводской цвет диапазона.";
         if (pal == Prefs.userPaletteIndex()) {
@@ -409,7 +402,6 @@ public final class MainActivity extends Activity {
         hint.setTextColor(getColor(R.color.muted));
         hint.setPadding(0, 0, 0, dp(8));
         list.addView(hint);
-
         ScrollView scroll = new ScrollView(this);
         scroll.addView(list);
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -418,12 +410,10 @@ public final class MainActivity extends Activity {
                 .setNeutralButton("Сбросить схему", (d, w) -> confirmResetPalette(pal))
                 .setNegativeButton("Готово", null)
                 .create();
-
         for (int j = 0; j < Prefs.BANDS; j++) {
             final int band = Prefs.BANDS - 1 - j;
             int color = Prefs.colorOf(this, pal, band);
             int fg = ColorPicker.contrast(color);
-
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
@@ -432,28 +422,32 @@ public final class MainActivity extends Activity {
             bg.setCornerRadius(dp(8));
             bg.setStroke(dp(1), 0x33888888);
             row.setBackground(bg);
-
             TextView label = new TextView(this);
             label.setText(Prefs.BAND_NAMES[band]);
             label.setTextSize(15);
             label.setTextColor(fg);
             label.setPadding(dp(14), dp(12), 0, dp(12));
             row.addView(label, new LinearLayout.LayoutParams(0, -2, 1f));
-
             TextView arrow = new TextView(this);
             arrow.setText("›");
             arrow.setTextSize(18);
             arrow.setTextColor(fg);
             arrow.setPadding(0, 0, dp(14), 0);
             row.addView(arrow);
-
             row.setOnClickListener(v -> {
                 dialog.dismiss();
                 ColorPicker.open(this, Prefs.BAND_NAMES[band],
-                        Prefs.colorOf(this, pal, band), picked -> {
+                        Prefs.colorOf(this, pal, band),
+                        pal, band,
+                        picked -> {
                             Prefs.setColor(this, pal, band, picked);
                             refreshWidget();
                             refreshUi();
+                            showBands(pal);
+                        },
+                        pal == Prefs.userPaletteIndex() ? null
+                                : colors -> {
+                            applyScheme(pal, colors);
                             showBands(pal);
                         });
             });
@@ -462,7 +456,6 @@ public final class MainActivity extends Activity {
                 confirmResetBand(pal, band, true);
                 return true;
             });
-
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
             lp.topMargin = dp(3);
             lp.bottomMargin = dp(3);
