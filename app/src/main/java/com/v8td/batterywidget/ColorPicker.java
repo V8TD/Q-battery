@@ -8,9 +8,11 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
@@ -38,13 +40,19 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Редактор цвета (0.7): превью с HEX внутри, проверка читаемости на подложке,
- *  квадраты групп, стили и таблица 7×30 (210 оттенков на стиль, 5880 цветов всего).
+/** Редактор цвета (0.8): превью с HEX внутри, квадрат насыщенности/яркости
+ *  и радужная полоска оттенка, проверка читаемости, таблица 7×30 (5880 цветов)
+ *  и генератор схемы из одного базового цвета (градиент / монохром).
  *  Метрики блоков групп/стилей/таблицы взяты из проверенного окна 0.6. */
 final class ColorPicker {
 
     interface Callback {
         void onColor(int color);
+    }
+
+    /** Приёмник готовой схемы: массив из 10 цветов, индекс 0 = 91–100%. */
+    interface SchemeCallback {
+        void onScheme(int[] colors);
     }
 
     /** Порядок как в считалке: Каждый Охотник Желает Знать, Где Сидит Фазан. */
@@ -53,8 +61,7 @@ final class ColorPicker {
     private static final float[] GROUP_HUES = {0f, 28f, 55f, 120f, 190f, 225f, 275f};
     private static final String[] STYLE_NAMES = {"Стандарт", "Неон", "Пастель", "Карамель"};
 
-    /** Таблица: 7 столбцов (насыщенность: слева бледнее, справа насыщеннее)
-     *  и 30 строк (яркость: сверху темнее, снизу светлее). */
+    /** Таблица: 7 столбцов (насыщенность) и 30 строк (яркость). */
     private static final int COLS = 7;
     private static final int ROWS = 30;
     private static final float[] SAT_MIN = {0.30f, 0.82f, 0.18f, 0.72f};
@@ -81,8 +88,7 @@ final class ColorPicker {
         return String.format("#%06X", 0xFFFFFF & color);
     }
 
-    /** Принимает ТОЛЬКО полные шесть символов (RRGGBB или #RRGGBB).
-     *  Короткие трёхзначные коды убраны: из-за них стирание символов само меняло цвет. */
+    /** Принимает ТОЛЬКО полные шесть символов (RRGGBB или #RRGGBB). */
     static Integer parseHex(String raw) {
         if (raw == null) return null;
         String s = raw.trim();
@@ -95,7 +101,6 @@ final class ColorPicker {
         }
     }
 
-    /** Ищет HEX в произвольном тексте (для кнопки «Вставить»). */
     private static Integer extractHex(String raw) {
         if (raw == null) return null;
         Integer whole = parseHex(raw);
@@ -104,7 +109,6 @@ final class ColorPicker {
         return m.find() ? parseHex(m.group()) : null;
     }
 
-    /** Цвет клетки таблицы: группа, стиль, столбец, строка (0 = самая тёмная). */
     private static int tableColor(int group, int style, int col, int row) {
         float sat = Math.min(1f, SAT_MIN[style] + SAT_STEP[style] * col);
         float val = Math.min(1f, VAL_MIN[style] + VAL_SPAN[style] * row / (ROWS - 1));
@@ -118,7 +122,6 @@ final class ColorPicker {
         return (long) dr * dr + (long) dg * dg + (long) db * db;
     }
 
-    /** Ближайшая клетка во всей таблице: {группа, стиль, столбец, строка, 1 = точное совпадение}. */
     private static int[] nearest(int color) {
         int bg = 0, bs = 0, bc = 0, br = 0;
         long best = Long.MAX_VALUE;
@@ -141,8 +144,6 @@ final class ColorPicker {
         return new int[]{bg, bs, bc, br, best == 0 ? 1 : 0};
     }
 
-    /** «Фото» для проверки читаемости: пёстрый фон рисуем кодом,
-     *  чтобы не класть в репозиторий бинарную картинку. */
     private static Bitmap makePhoto() {
         int w = 240;
         int h = 160;
@@ -163,8 +164,48 @@ final class ColorPicker {
         return bmp;
     }
 
+    private static float clamp01(float v) {
+        return Math.max(0f, Math.min(1f, v));
+    }
+
+    private static float wrapHue(float h) {
+        return ((h % 360f) + 360f) % 360f;
+    }
+
+    /** Генератор: 0 = градиент (проход по оттенкам), 1 = монохром (шаги яркости).
+     *  Базовый цвет встаёт ровно в диапазон anchor, остальные выводятся от него. */
+    static int[] scheme(int base, int anchor, int mode) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(base, hsv);
+        int[] out = new int[Prefs.BANDS];
+        for (int band = 0; band < Prefs.BANDS; band++) {
+            int d = band - anchor;
+            float h, s, v;
+            if (mode == 0) {
+                h = wrapHue(hsv[0] - d * 13f);
+                s = hsv[1];
+                v = hsv[2];
+            } else {
+                h = hsv[0];
+                s = clamp01(hsv[1] - 0.04f * d);
+                v = clamp01(hsv[2] - 0.06f * d);
+            }
+            out[band] = Color.HSVToColor(new float[]{h, s, v});
+        }
+        return out;
+    }
+
+    /** Старый вызов без генератора. */
     static void open(Activity a, String title, int initial, Callback callback) {
+        open(a, title, initial, -1, -1, callback, null);
+    }
+
+    static void open(Activity a, String title, int initial,
+                     int paletteIndex, int band,
+                     Callback callback, SchemeCallback schemeCallback) {
         final int[] cur = {initial};
+        final float[] hsv = new float[3];
+        Color.colorToHSV(initial, hsv);
         final int[] near0 = nearest(initial);
         final int[] vg = {near0[0]};
         final int[] vs = {near0[1]};
@@ -174,7 +215,6 @@ final class ColorPicker {
 
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
-        // Отступы как в проверенном окне 0.6: 12dp по бокам.
         box.setPadding(dpPx(a, 12), dpPx(a, 8), dpPx(a, 12), dpPx(a, 8));
 
         ScrollView scroll = new ScrollView(a);
@@ -198,7 +238,6 @@ final class ColorPicker {
         hex.setTypeface(Typeface.DEFAULT_BOLD);
         hex.setGravity(Gravity.CENTER);
         hex.setBackground(null);
-        // Внутренние отступы = увеличенная зона тапа по всем сторонам.
         hex.setPadding(dpPx(a, 14), dpPx(a, 10), dpPx(a, 14), dpPx(a, 10));
         hex.setHint("#35D9FF");
         hex.setText(toHex(initial));
@@ -214,7 +253,11 @@ final class ColorPicker {
         hexStatus.setTextColor(a.getColor(R.color.muted));
         hexStatus.setPadding(dpPx(a, 2), dpPx(a, 4), dpPx(a, 2), 0);
 
-        // --- 2. Читаемость: плитка размером с виджет и четыре квадратные подложки. ---
+        // --- 2. Точная настройка: квадрат и радужная полоска. ---
+        SvSquare square = new SvSquare(a);
+        HueStrip strip = new HueStrip(a);
+
+        // --- 3. Читаемость: плитка размером с виджет и четыре квадратные подложки. ---
         final TextView tile = new TextView(a);
         tile.setText("88");
         tile.setGravity(Gravity.CENTER);
@@ -249,8 +292,6 @@ final class ColorPicker {
         readRow.addView(tile, tileLp);
         readRow.addView(rightBox, new LinearLayout.LayoutParams(dpPx(a, 104), -2));
 
-        // Цифры плитки подбираются измерением: «88» занимает 86% ширины,
-        // те же пропорции, что на реальном виджете.
         tile.post(() -> {
             Paint mp = new Paint(tile.getPaint());
             mp.setTextSize(100f);
@@ -260,7 +301,7 @@ final class ColorPicker {
             }
         });
 
-        // --- 3. Семь квадратных цветных кнопок групп. ---
+        // --- 4. Семь квадратных цветных кнопок групп. ---
         LinearLayout chipsRow = new LinearLayout(a);
         chipsRow.setOrientation(LinearLayout.HORIZONTAL);
         View[] chips = new View[GROUP_NAMES.length];
@@ -272,14 +313,13 @@ final class ColorPicker {
             chips[i] = chip;
         }
 
-        // Надпись над квадратами: показывает имя выбранной группы.
         TextView groupLabel = new TextView(a);
         groupLabel.setTextSize(13);
         groupLabel.setTextColor(a.getColor(R.color.muted));
         groupLabel.setPadding(0, dpPx(a, 8), 0, dpPx(a, 4));
         groupLabel.setText(GROUP_NAMES[vg[0]]);
 
-        // --- 4. Кнопки стилей: метрики один в один из окна 0.6. ---
+        // --- 5. Кнопки стилей: метрики один в один из окна 0.6. ---
         LinearLayout stylesRow = new LinearLayout(a);
         stylesRow.setOrientation(LinearLayout.HORIZONTAL);
         Button[] styleBtns = new Button[STYLE_NAMES.length];
@@ -304,12 +344,11 @@ final class ColorPicker {
         tableCaption.setTextColor(a.getColor(R.color.muted));
         tableCaption.setPadding(dpPx(a, 2), dpPx(a, 8), dpPx(a, 2), dpPx(a, 4));
 
-        // --- 5. Таблица 7×30 одним полотном. ---
+        // --- 6. Таблица 7×30 одним полотном. ---
         ShadeTable table = new ShadeTable(a);
         table.setView(vg[0], vs[0]);
         table.setMark(near0[2], near0[3], near0[4] == 1);
 
-        // --- Перерисовка квадратов групп. ---
         final Runnable[] drawChips = new Runnable[1];
         drawChips[0] = () -> {
             for (int i = 0; i < chips.length; i++) {
@@ -323,7 +362,6 @@ final class ColorPicker {
             }
         };
 
-        // --- Перерисовка кнопок стилей. ---
         final Runnable[] drawStyles = new Runnable[1];
         drawStyles[0] = () -> {
             for (int i = 0; i < styleBtns.length; i++) {
@@ -338,8 +376,6 @@ final class ColorPicker {
             }
         };
 
-        // --- Прокрутка к строке текущего цвета: сначала возвращаем таблицу
-        //     к группе и стилю, где цвет живёт, потом едем к строке. ---
         final Runnable scrollToColor = () -> {
             int[] n = lastNear[0];
             if (vg[0] != n[0] || vs[0] != n[1]) {
@@ -355,7 +391,6 @@ final class ColorPicker {
             scroll.smoothScrollTo(0, Math.max(0, y));
         };
 
-        // --- Плитка-виджет и квадраты подложек. ---
         final Runnable drawReadability = () -> {
             tile.setBackground(bgIndex[0] == 3
                     ? new BitmapDrawable(a.getResources(), photo)
@@ -375,7 +410,6 @@ final class ColorPicker {
             }
         };
 
-        // --- Кольцо: видно, только если ближайший цвет в открытой сейчас паре. ---
         final Runnable refreshMark = () -> {
             int[] n = lastNear[0];
             if (n[0] == vg[0] && n[1] == vs[0]) {
@@ -385,7 +419,6 @@ final class ColorPicker {
             }
         };
 
-        // --- Главное обновление: плашка, HEX, статус, квадраты, стили, кольцо, плитка. ---
         final Runnable apply = () -> {
             int color = cur[0];
             GradientDrawable pbg = new GradientDrawable();
@@ -399,6 +432,10 @@ final class ColorPicker {
                 hex.setSelection(hex.getText().length());
                 lockHex[0] = false;
             }
+            Color.colorToHSV(color, hsv);
+            square.setHue(hsv[0]);
+            square.setSV(hsv[1], hsv[2]);
+            strip.setHue(hsv[0]);
             int[] near = nearest(color);
             lastNear[0] = near;
             hexStatus.setText(near[4] == 1
@@ -428,6 +465,18 @@ final class ColorPicker {
             if (imm != null) {
                 imm.showSoftInput(hex, InputMethodManager.SHOW_IMPLICIT);
             }
+        });
+
+        square.setOnPick((s, v) -> {
+            hsv[1] = s;
+            hsv[2] = v;
+            cur[0] = Color.HSVToColor(hsv);
+            apply.run();
+        });
+        strip.setOnHue(h -> {
+            hsv[0] = h;
+            cur[0] = Color.HSVToColor(hsv);
+            apply.run();
         });
 
         for (int i = 0; i < chips.length; i++) {
@@ -519,6 +568,13 @@ final class ColorPicker {
         brlp.topMargin = dpPx(a, 4);
         box.addView(buttonsRow, brlp);
         box.addView(hexStatus, new LinearLayout.LayoutParams(-1, -2));
+        box.addView(label(a, "Точная настройка"));
+        box.addView(square, new LinearLayout.LayoutParams(-1, dpPx(a, 160)));
+        LinearLayout.LayoutParams stlp = new LinearLayout.LayoutParams(-1, dpPx(a, 26));
+        stlp.topMargin = dpPx(a, 6);
+        box.addView(strip, stlp);
+        box.addView(hint(a, "Веди пальцем по квадрату — насыщенность и яркость;"
+                + " по полоске — оттенок."));
         box.addView(label(a, "Читаемость цифр на обоях"));
         box.addView(readRow, new LinearLayout.LayoutParams(-1, -2));
         box.addView(hint(a, "Квадраты справа — подложка под виджет: чёрная, белая,"
@@ -539,19 +595,152 @@ final class ColorPicker {
 
         scroll.addView(box);
 
-        new AlertDialog.Builder(a)
+        AlertDialog dialog = new AlertDialog.Builder(a)
                 .setTitle("Цвет")
                 .setView(scroll)
                 .setNegativeButton("Отмена", null)
+                .setNeutralButton("Собрать схему", null)
                 .setPositiveButton("Сохранить", (d, w) -> callback.onColor(cur[0]))
-                .show();
+                .create();
+        dialog.show();
 
-        // Автопрокрутка к строке выбранного (или ближайшего) цвета.
+        // Генератор живёт в третьей кнопке окна: страницу не удлиняет.
+        Button neutral = dialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+        if (neutral != null) {
+            if (schemeCallback != null && paletteIndex >= 0 && band >= 0) {
+                final int pal = paletteIndex;
+                final int anchor = band;
+                neutral.setOnClickListener(v ->
+                        showGenerator(a, pal, anchor, cur[0], schemeCallback));
+            } else {
+                neutral.setVisibility(View.GONE);
+            }
+        }
+
         scroll.post(() -> {
             int[] n = lastNear[0];
             int y = table.getTop() + n[3] * table.rowHeight() - scroll.getHeight() / 2;
             scroll.scrollTo(0, Math.max(0, y));
         });
+    }
+
+    /** Окно генератора: режим,预览 десяти цветов, подтверждение перезаписи. */
+    private static void showGenerator(Activity a, int pal, int anchor,
+                                      int base, SchemeCallback callback) {
+        final int[] mode = {0};
+        final int[][] colors = {scheme(base, anchor, 0)};
+
+        LinearLayout content = new LinearLayout(a);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dpPx(a, 12), dpPx(a, 8), dpPx(a, 12), dpPx(a, 8));
+
+        LinearLayout baseRow = new LinearLayout(a);
+        baseRow.setOrientation(LinearLayout.HORIZONTAL);
+        baseRow.setGravity(Gravity.CENTER_VERTICAL);
+        View swatch = new View(a);
+        GradientDrawable sw = new GradientDrawable();
+        sw.setColor(base);
+        sw.setCornerRadius(dpPx(a, 6));
+        sw.setStroke(dpPx(a, 1), 0x66889099);
+        swatch.setBackground(sw);
+        baseRow.addView(swatch, new LinearLayout.LayoutParams(dpPx(a, 34), dpPx(a, 34)));
+        TextView baseHex = new TextView(a);
+        baseHex.setText(toHex(base));
+        baseHex.setTextSize(15);
+        baseHex.setTypeface(Typeface.DEFAULT_BOLD);
+        baseHex.setTextColor(a.getColor(R.color.text));
+        LinearLayout.LayoutParams bhp = new LinearLayout.LayoutParams(-2, -2);
+        bhp.setMargins(dpPx(a, 8), 0, 0, 0);
+        baseRow.addView(baseHex, bhp);
+        content.addView(baseRow, new LinearLayout.LayoutParams(-1, -2));
+
+        content.addView(label(a, "Режим"));
+        LinearLayout modesRow = new LinearLayout(a);
+        modesRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button[] modeBtns = new Button[2];
+        String[] modeNames = {"Градиент", "Монохром"};
+        for (int i = 0; i < 2; i++) {
+            Button b = new Button(a);
+            b.setText(modeNames[i]);
+            b.setAllCaps(false);
+            b.setTextSize(11);
+            b.setMinWidth(0);
+            b.setMinimumWidth(0);
+            b.setPadding(0, 0, 0, 0);
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(0, dpPx(a, 36), 1f);
+            blp.setMargins(dpPx(a, 2), dpPx(a, 2), dpPx(a, 2), dpPx(a, 2));
+            modesRow.addView(b, blp);
+            modeBtns[i] = b;
+        }
+        content.addView(modesRow, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView anchorHint = new TextView(a);
+        anchorHint.setText("Базовый цвет встанет в диапазон «" + Prefs.BAND_NAMES[anchor]
+                + "». Остальные девять выводятся от него.");
+        anchorHint.setTextSize(12);
+        anchorHint.setTextColor(a.getColor(R.color.muted));
+        anchorHint.setPadding(dpPx(a, 2), dpPx(a, 8), dpPx(a, 2), dpPx(a, 4));
+        content.addView(anchorHint, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout preview = new LinearLayout(a);
+        preview.setOrientation(LinearLayout.HORIZONTAL);
+        View[] chips = new View[Prefs.BANDS];
+        for (int j = 0; j < Prefs.BANDS; j++) {
+            View chip = new View(a);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, dpPx(a, 34), 1f);
+            clp.setMargins(dpPx(a, 1), 0, dpPx(a, 1), 0);
+            preview.addView(chip, clp);
+            chips[j] = chip;
+        }
+        content.addView(preview, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView warn = new TextView(a);
+        warn.setText("Перезапишет все 10 диапазонов схемы «" + Prefs.PALETTE_NAMES[pal]
+                + "». Откат — «Сбросить схему».");
+        warn.setTextSize(11);
+        warn.setTextColor(a.getColor(R.color.warn));
+        warn.setPadding(dpPx(a, 2), dpPx(a, 8), dpPx(a, 2), 0);
+        content.addView(warn, new LinearLayout.LayoutParams(-1, -2));
+
+        final Runnable[] draw = new Runnable[1];
+        draw[0] = () -> {
+            colors[0] = scheme(base, anchor, mode[0]);
+            for (int i = 0; i < 2; i++) {
+                Button b = modeBtns[i];
+                b.setTextColor(a.getColor(R.color.text));
+                GradientDrawable bg = new GradientDrawable();
+                bg.setColor(a.getColor(R.color.button));
+                bg.setCornerRadius(dpPx(a, 8));
+                bg.setStroke(dpPx(a, i == mode[0] ? 2 : 1),
+                        i == mode[0] ? a.getColor(R.color.accent) : a.getColor(R.color.stroke));
+                b.setBackground(bg);
+            }
+            // Слева минимум, справа максимум — как везде в приложении.
+            for (int j = 0; j < Prefs.BANDS; j++) {
+                int band = Prefs.BANDS - 1 - j;
+                GradientDrawable shape = new GradientDrawable();
+                shape.setColor(colors[0][band]);
+                shape.setCornerRadius(dpPx(a, 4));
+                shape.setStroke(dpPx(a, band == anchor ? 2 : 1),
+                        band == anchor ? a.getColor(R.color.accent) : 0x55889099);
+                chips[j].setBackground(shape);
+            }
+        };
+        for (int i = 0; i < 2; i++) {
+            final int mi = i;
+            modeBtns[i].setOnClickListener(v -> {
+                mode[0] = mi;
+                draw[0].run();
+            });
+        }
+        draw[0].run();
+
+        new AlertDialog.Builder(a)
+                .setTitle("Собрать схему из цвета")
+                .setView(content)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Применить", (d, w) -> callback.onScheme(colors[0]))
+                .show();
     }
 
     private static Button smallButton(Activity a, String text) {
@@ -610,7 +799,196 @@ final class ColorPicker {
         }
     }
 
-    /** Вся таблица (7 столбцов × 30 строк) рисуется одним View, а не сотней клеток. */
+    /** Квадрат насыщенности/яркости: слева бледно, справа насыщенно,
+     *  сверху светло, снизу темно. Одно полотно, маркер-кольцо. */
+    private static final class SvSquare extends View {
+
+        interface OnPick {
+            void onPick(float sat, float val);
+        }
+
+        private final Paint base = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint shade = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint mark = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rect = new RectF();
+        private float hue = -1f;
+        private float sat = 1f;
+        private float val = 1f;
+        private int shaderW = -1;
+        private int shaderH = -1;
+        private OnPick listener;
+        private float lastX = -1;
+        private float lastY = -1;
+
+        SvSquare(Context c) {
+            super(c);
+            halo.setStyle(Paint.Style.STROKE);
+            halo.setStrokeWidth(dpPx(c, 4));
+            halo.setColor(0x66000000);
+            mark.setStyle(Paint.Style.STROKE);
+            mark.setStrokeWidth(dpPx(c, 2));
+            mark.setColor(0xFFFFFFFF);
+        }
+
+        void setOnPick(OnPick l) {
+            listener = l;
+        }
+
+        void setHue(float h) {
+            if (hue != h) {
+                hue = h;
+                shaderW = -1;
+                invalidate();
+            }
+        }
+
+        void setSV(float s, float v) {
+            sat = s;
+            val = v;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas cv) {
+            int w = getWidth();
+            int h = getHeight();
+            if (w <= 0 || h <= 0) return;
+            if (shaderW != w || shaderH != h) {
+                int hueColor = Color.HSVToColor(new float[]{hue, 1f, 1f});
+                base.setShader(new LinearGradient(0, 0, w, 0,
+                        0xFFFFFFFF, hueColor, Shader.TileMode.CLAMP));
+                shade.setShader(new LinearGradient(0, 0, 0, h,
+                        0x00000000, 0xFF000000, Shader.TileMode.CLAMP));
+                shaderW = w;
+                shaderH = h;
+            }
+            float r = dpPx(getContext(), 6);
+            rect.set(0, 0, w, h);
+            cv.drawRoundRect(rect, r, r, base);
+            cv.drawRoundRect(rect, r, r, shade);
+            float x = Math.max(0, Math.min(w, sat * w));
+            float y = Math.max(0, Math.min(h, (1f - val) * h));
+            float mr = dpPx(getContext(), 7);
+            cv.drawCircle(x, y, mr, halo);
+            cv.drawCircle(x, y, mr, mark);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent e) {
+            if (e.getAction() == MotionEvent.ACTION_DOWN && getParent() != null) {
+                getParent().requestDisallowInterceptTouchEvent(true);
+            }
+            lastX = e.getX();
+            lastY = e.getY();
+            if (e.getAction() == MotionEvent.ACTION_UP) {
+                performClick();
+            } else {
+                pick();
+            }
+            return true;
+        }
+
+        private void pick() {
+            if (listener == null || getWidth() <= 0 || getHeight() <= 0) return;
+            float s = Math.max(0f, Math.min(1f, lastX / getWidth()));
+            float v = 1f - Math.max(0f, Math.min(1f, lastY / getHeight()));
+            listener.onPick(s, v);
+        }
+
+        @Override
+        public boolean performClick() {
+            pick();
+            return super.performClick();
+        }
+    }
+
+    /** Радужная полоска оттенка с маркером. */
+    private static final class HueStrip extends View {
+
+        interface OnHue {
+            void onHue(float hue);
+        }
+
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint mark = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rect = new RectF();
+        private float hue = 0f;
+        private int shaderW = -1;
+        private OnHue listener;
+        private float lastX = -1;
+
+        HueStrip(Context c) {
+            super(c);
+            halo.setStyle(Paint.Style.STROKE);
+            halo.setStrokeWidth(dpPx(c, 4));
+            halo.setColor(0x66000000);
+            mark.setStyle(Paint.Style.STROKE);
+            mark.setStrokeWidth(dpPx(c, 2));
+            mark.setColor(0xFFFFFFFF);
+        }
+
+        void setOnHue(OnHue l) {
+            listener = l;
+        }
+
+        void setHue(float h) {
+            hue = h;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas cv) {
+            int w = getWidth();
+            int h = getHeight();
+            if (w <= 0 || h <= 0) return;
+            if (shaderW != w) {
+                int[] stops = new int[7];
+                for (int i = 0; i < 7; i++) {
+                    stops[i] = Color.HSVToColor(new float[]{i * 60f, 1f, 1f});
+                }
+                fill.setShader(new LinearGradient(0, 0, w, 0, stops, null,
+                        Shader.TileMode.CLAMP));
+                shaderW = w;
+            }
+            float r = dpPx(getContext(), 6);
+            rect.set(0, 0, w, h);
+            cv.drawRoundRect(rect, r, r, fill);
+            float x = Math.max(0, Math.min(w, hue / 360f * w));
+            float mr = dpPx(getContext(), 7);
+            cv.drawCircle(x, h / 2f, mr, halo);
+            cv.drawCircle(x, h / 2f, mr, mark);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent e) {
+            if (e.getAction() == MotionEvent.ACTION_DOWN && getParent() != null) {
+                getParent().requestDisallowInterceptTouchEvent(true);
+            }
+            lastX = e.getX();
+            if (e.getAction() == MotionEvent.ACTION_UP) {
+                performClick();
+            } else {
+                pick();
+            }
+            return true;
+        }
+
+        private void pick() {
+            if (listener == null || getWidth() <= 0) return;
+            float h = Math.max(0f, Math.min(1f, lastX / getWidth())) * 360f;
+            listener.onHue(h);
+        }
+
+        @Override
+        public boolean performClick() {
+            pick();
+            return super.performClick();
+        }
+    }
+
+    /** Вся таблица (7 столбцов × 30 строк) рисуется одним View. */
     private static final class ShadeTable extends View {
 
         interface OnCellTap {
