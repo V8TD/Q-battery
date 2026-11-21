@@ -31,7 +31,7 @@ final class Prefs {
 
     /** Арлекин: мозаика несочетаемых цветов. Порядок тот же. */
     private static final int[] HARLEQUIN = {
-            0xFFC6FF00, 0xFFFF00A8, 0xFF00E5FF, 0xFFFF6D00, 0xFF4D5BFF,
+            0xFFC6FF00, 0xFFFF00A8, 0xFF00E5FF, 0xFF6D00, 0xFF4D5BFF,
             0xFFFFD400, 0xFF00C853, 0xFFFF2D55, 0xFFB388FF, 0xFFC8A020
     };
 
@@ -39,32 +39,6 @@ final class Prefs {
             "91–100%", "81–90%", "71–80%", "61–70%", "51–60%",
             "41–50%", "31–40%", "21–30%", "11–20%", "0–10%"
     };
-
-    /** Режимы значков на виджете. Индекс совпадает с порядком в списке настроек. */
-    static final int MODES = 8;
-    static final String[] MODE_NAMES = {
-            "Только цифры",
-            "Молния вверху справа",
-            "Молния внизу по центру",
-            "Процент вверху справа",
-            "Процент внизу по центру",
-            "Процент вверху, молния внизу",
-            "Процент внизу, молния вверху",
-            "Молния позади цифр"
-    };
-    static final String[] MODE_HINTS = {
-            "Ничего лишнего, цифры максимального размера",
-            "Молния только при зарядке, в углу",
-            "Молния только при зарядке, под цифрами",
-            "Знак % виден всегда",
-            "Знак % виден всегда, под цифрами",
-            "% вверху справа, молния внизу по центру",
-            "% внизу по центру, молния вверху справа",
-            "Большая полупрозрачная молния только при зарядке"
-    };
-
-    /** Оформление цифр: 0 — нет, 1 — тень, 2 — тонкий контур. */
-    static final String[] OUTLINE_NAMES = {"Нет", "Тень", "Тонкий контур"};
 
     private static final String MIGRATED = "palettes_v2";
 
@@ -148,28 +122,6 @@ final class Prefs {
 
     static void setChargingBlue(Context c, boolean v) {
         putBoolean(get(c), "charging_blue", v);
-        bump();
-    }
-
-    /** Режим значков. По умолчанию 0 — только цифры. */
-    static int iconMode(Context c) {
-        int m = get(c).getInt("icon_mode", 0);
-        return Math.max(0, Math.min(MODES - 1, m));
-    }
-
-    static void setIconMode(Context c, int mode) {
-        putInt(get(c), "icon_mode", Math.max(0, Math.min(MODES - 1, mode)));
-        bump();
-    }
-
-    /** Обводка цифр. По умолчанию 0 — нет. */
-    static int outline(Context c) {
-        int o = get(c).getInt("outline_style", 0);
-        return Math.max(0, Math.min(OUTLINE_NAMES.length - 1, o));
-    }
-
-    static void setOutline(Context c, int style) {
-        putInt(get(c), "outline_style", Math.max(0, Math.min(OUTLINE_NAMES.length - 1, style)));
         bump();
     }
 
