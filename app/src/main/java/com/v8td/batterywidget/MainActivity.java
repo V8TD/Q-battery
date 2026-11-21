@@ -114,6 +114,7 @@ public final class MainActivity extends Activity {
         bands.setOnClickListener(v -> showBands(Prefs.palette(this)));
 
         swChargingBlue = findViewById(R.id.sw_charging_blue);
+        swChargingBlue.setOnCheckedChangeListener(null);
         swChargingBlue.setChecked(Prefs.chargingBlue(this));
         swChargingBlue.setOnCheckedChangeListener((b, checked) -> {
             Prefs.setChargingBlue(this, checked);
@@ -176,12 +177,15 @@ public final class MainActivity extends Activity {
                 getColor(R.color.muted)));
     }
 
+    /** Состояние значка. Если пользователь не менял — берём из манифеста, там включено. */
     private boolean launcherIconEnabled() {
         try {
             int st = getPackageManager().getComponentEnabledSetting(new ComponentName(this, ALIAS));
-            return st == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
+            if (st == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) return true;
+            if (st == PackageManager.COMPONENT_ENABLED_STATE_DISABLED) return false;
+            return true;
         } catch (Throwable t) {
-            return false;
+            return true;
         }
     }
 
@@ -214,7 +218,12 @@ public final class MainActivity extends Activity {
         tvThreshold.setText("когда заряд дойдёт до " + Prefs.threshold(this) + "%");
         swSound.setChecked(Prefs.soundEnabled(this));
         seek.setProgress(Prefs.threshold(this) - 50);
+        swChargingBlue.setOnCheckedChangeListener(null);
         swChargingBlue.setChecked(Prefs.chargingBlue(this));
+        swChargingBlue.setOnCheckedChangeListener((b, checked) -> {
+            Prefs.setChargingBlue(this, checked);
+            refreshWidget();
+        });
         syncLauncherIcon();
         updateSystemButton();
 
@@ -546,8 +555,9 @@ public final class MainActivity extends Activity {
                         + "• Автозапуск приложения;\n"
                         + "• Экономию заряда — «Без ограничений»;\n"
                         + "• Фоновую активность, если такой пункт есть.\n\n"
-                        + "Если Q-battery не находится в списке экономии заряда — включите значок "
-                        + "приложения в разделе «Системные настройки» и поищите снова.\n\n"
+                        + "Значок Q-battery в списке приложений включён — так система показывает "
+                        + "приложение в списках батареи. Если приложение там не находится, "
+                        + "зайдите в его карточку через «Системные настройки приложения».\n\n"
                         + "На других телефонах названия пунктов отличаются. Приложение не может "
                         + "отключить системные ограничения само — оно только открывает нужный раздел.")
                 .setPositiveButton("Понятно", null)
