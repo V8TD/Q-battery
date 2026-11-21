@@ -428,15 +428,17 @@ final class ColorPicker {
         });
     }
 
-    /** Позиция блока таблицы внутри страницы (для прокрутки). */
+    /** Позиция блока таблицы внутри страницы (для прокрутки по тапу на превью). */
     private static int tableTop(LinearLayout box) {
         for (int i = 0; i < box.getChildCount(); i++) {
             View v = box.getChildAt(i);
-            if (v instanceof LinearLayout
-                    && ((LinearLayout) v).getOrientation() == LinearLayout.VERTICAL
-                    && v.getChildAt(0) instanceof TextView
-                    && v.getChildAt(1) instanceof ShadeTable) {
-                return v.getTop();
+            if (v instanceof LinearLayout) {
+                LinearLayout ll = (LinearLayout) v;
+                for (int j = 0; j < ll.getChildCount(); j++) {
+                    if (ll.getChildAt(j) instanceof ShadeTable) {
+                        return v.getTop();
+                    }
+                }
             }
         }
         return 0;
@@ -574,4 +576,14 @@ final class ColorPicker {
 
         @Override
         public boolean performClick() {
-            if (listener != null && last
+            if (listener != null && lastX >= 0 && getWidth() > 0) {
+                int col = (int) (lastX / (getWidth() / 4f));
+                int row = (int) (lastY / cellH);
+                if (col >= 0 && col < 4 && row >= 0 && row < ROWS) {
+                    listener.onTap(tableColor(group, col, row));
+                }
+            }
+            return super.performClick();
+        }
+    }
+}
