@@ -8,7 +8,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.ColorDrawable;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.RectF;
