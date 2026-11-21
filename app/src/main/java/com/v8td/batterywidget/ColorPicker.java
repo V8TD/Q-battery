@@ -34,14 +34,12 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.util.Locale;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Редактор цвета (0.7): превью с HEX внутри, проверка читаемости на подложке
- *  с живым измерением контраста, квадраты групп, стили и таблица 7×30
- *  (210 оттенков на стиль, 5880 цветов всего).
+/** Редактор цвета (0.7): превью с HEX внутри, проверка читаемости на подложке,
+ *  квадраты групп, стили и таблица 7×30 (210 оттенков на стиль, 5880 цветов всего).
  *  Метрики блоков групп/стилей/таблицы взяты из проверенного окна 0.6. */
 final class ColorPicker {
 
@@ -68,10 +66,6 @@ final class ColorPicker {
     private static final int[] BG_COLORS = {0xFF000000, 0xFFFFFFFF, 0xFF3A6EA5, 0};
     private static final String[] BG_DESC =
             {"Чёрный фон", "Белый фон", "Цветной фон", "Пёстрый фон (фото)"};
-    private static final String[] BG_SHORT = {"тёмн.", "светл.", "цветн.", "фото"};
-
-    /** Средняя яркость пёстрого «фото», считается один раз при его создании. */
-    private static float photoLuma = 0.3f;
 
     private static final Pattern HEX_PATTERN = Pattern.compile("#?[0-9A-Fa-f]{6}");
 
@@ -108,46 +102,6 @@ final class ColorPicker {
         if (whole != null) return whole;
         Matcher m = HEX_PATTERN.matcher(raw);
         return m.find() ? parseHex(m.group()) : null;
-    }
-
-    /** Относительная яркость по WCAG (0 — чёрный, 1 — белый). */
-    private static float luma(int color) {
-        return 0.2126f * channel(Color.red(color))
-                + 0.7152f * channel(Color.green(color))
-                + 0.0722f * channel(Color.blue(color));
-    }
-
-    private static float channel(int v) {
-        float s = v / 255f;
-        return s <= 0.03928f ? s / 12.92f : (float) Math.pow((s + 0.055f) / 1.055f, 2.4);
-    }
-
-    /** Контраст цвета цифр с подложкой: от 1:1 (не видно) до 21:1 (чёрное на белом). */
-    private static float contrastRatio(int fg, float bgLuma) {
-        float f = luma(fg);
-        float hi = Math.max(f, bgLuma);
-        float lo = Math.min(f, bgLuma);
-        return (hi + 0.05f) / (lo + 0.05f);
-    }
-
-    private static String fmtRatio(float r) {
-        return r >= 9.95f
-                ? String.format(Locale.US, "%.0f:1", r)
-                : String.format(Locale.US, "%.1f:1", r);
-    }
-
-    private static String verdict(float r) {
-        if (r >= 7f) return "отлично читается";
-        if (r >= 4.5f) return "хорошо читается";
-        if (r >= 3f) return "читается с трудом";
-        return "почти не видно";
-    }
-
-    private static int verdictColor(Activity a, float r) {
-        if (r >= 4.5f) return a.getColor(R.color.ok);
-        if (r >= 3f) return a.getColor(R.color.warn);
-        // Красный подбираем под тему: светлый на тёмной, тёмный на светлой.
-        return luma(a.getColor(R.color.text)) > 0.5f ? 0xFFEF7070 : 0xFFC62828;
     }
 
     /** Цвет клетки таблицы: группа, стиль, столбец, строка (0 = самая тёмная). */
@@ -206,15 +160,6 @@ final class ColorPicker {
             cv.drawCircle(rnd.nextFloat() * w, rnd.nextFloat() * h,
                     8f + rnd.nextFloat() * 38f, p);
         }
-        float sum = 0f;
-        int n = 0;
-        for (int y = 0; y < h; y += 4) {
-            for (int x = 0; x < w; x += 4) {
-                sum += luma(bmp.getPixel(x, y));
-                n++;
-            }
-        }
-        photoLuma = n > 0 ? sum / n : 0.3f;
         return bmp;
     }
 
@@ -269,7 +214,7 @@ final class ColorPicker {
         hexStatus.setTextColor(a.getColor(R.color.muted));
         hexStatus.setPadding(dpPx(a, 2), dpPx(a, 4), dpPx(a, 2), 0);
 
-        // --- 2. Читаемость: плитка, четыре подложки и панель контраста. ---
+        // --- 2. Читаемость: плитка размером с виджет и четыре квадратные подложки. ---
         final TextView tile = new TextView(a);
         tile.setText("88");
         tile.setGravity(Gravity.CENTER);
@@ -296,50 +241,13 @@ final class ColorPicker {
             rightBox.addView(row, new LinearLayout.LayoutParams(-1, -2));
         }
 
-        // Панель контраста: большое число + вердикт + четыре строки по подложкам.
-        final TextView tvRatio = new TextView(a);
-        tvRatio.setTextSize(20);
-        tvRatio.setTypeface(Typeface.DEFAULT_BOLD);
-        final TextView tvVerdict = new TextView(a);
-        tvVerdict.setTextSize(11);
-        final View[] infoSwatches = new View[4];
-        final TextView[] infoTexts = new TextView[4];
-        final LinearLayout[] infoRows = new LinearLayout[4];
-        LinearLayout infoPanel = new LinearLayout(a);
-        infoPanel.setOrientation(LinearLayout.VERTICAL);
-        infoPanel.setGravity(Gravity.CENTER_VERTICAL);
-        infoPanel.addView(tvRatio, new LinearLayout.LayoutParams(-2, -2));
-        infoPanel.addView(tvVerdict, new LinearLayout.LayoutParams(-1, -2));
-        for (int i = 0; i < 4; i++) {
-            LinearLayout row = new LinearLayout(a);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            View sw = new View(a);
-            LinearLayout.LayoutParams swlp =
-                    new LinearLayout.LayoutParams(dpPx(a, 10), dpPx(a, 10));
-            swlp.setMargins(0, 0, dpPx(a, 5), 0);
-            row.addView(sw, swlp);
-            TextView tx = new TextView(a);
-            tx.setTextSize(10);
-            row.addView(tx, new LinearLayout.LayoutParams(0, -2, 1f));
-            LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
-            rlp.topMargin = dpPx(a, 3);
-            infoPanel.addView(row, rlp);
-            infoSwatches[i] = sw;
-            infoTexts[i] = tx;
-            infoRows[i] = row;
-        }
-
         LinearLayout readRow = new LinearLayout(a);
         readRow.setOrientation(LinearLayout.HORIZONTAL);
-        readRow.setGravity(Gravity.CENTER_VERTICAL);
+        readRow.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams(dpPx(a, 104), dpPx(a, 104));
         tileLp.setMargins(dpPx(a, 2), dpPx(a, 2), dpPx(a, 8), dpPx(a, 2));
         readRow.addView(tile, tileLp);
         readRow.addView(rightBox, new LinearLayout.LayoutParams(dpPx(a, 104), -2));
-        LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, -2, 1f);
-        infoLp.setMargins(dpPx(a, 8), 0, 0, 0);
-        readRow.addView(infoPanel, infoLp);
 
         // Цифры плитки подбираются измерением: «88» занимает 86% ширины,
         // те же пропорции, что на реальном виджете.
@@ -467,35 +375,6 @@ final class ColorPicker {
             }
         };
 
-        // --- Панель контраста: число, вердикт и четыре строки по подложкам. ---
-        final Runnable refreshInfo = () -> {
-            int color = cur[0];
-            float[] ratios = new float[4];
-            for (int i = 0; i < 4; i++) {
-                float bgL = i == 3 ? photoLuma : luma(BG_COLORS[i]);
-                ratios[i] = contrastRatio(color, bgL);
-            }
-            float sel = ratios[bgIndex[0]];
-            tvRatio.setText(fmtRatio(sel));
-            tvRatio.setTextColor(verdictColor(a, sel));
-            tvVerdict.setText(verdict(sel));
-            tvVerdict.setTextColor(verdictColor(a, sel));
-            for (int i = 0; i < 4; i++) {
-                boolean selRow = i == bgIndex[0];
-                infoTexts[i].setText(BG_SHORT[i] + "  " + fmtRatio(ratios[i]));
-                infoTexts[i].setTextColor(verdictColor(a, ratios[i]));
-                infoTexts[i].setTypeface(selRow ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-                Drawable base = i == 3
-                        ? new BitmapDrawable(a.getResources(), photo)
-                        : new ColorDrawable(BG_COLORS[i]);
-                GradientDrawable ring = new GradientDrawable();
-                ring.setCornerRadius(dpPx(a, 2));
-                ring.setStroke(dpPx(a, selRow ? 2 : 1),
-                        selRow ? a.getColor(R.color.accent) : 0x66889099);
-                infoSwatches[i].setBackground(new LayerDrawable(new Drawable[]{base, ring}));
-            }
-        };
-
         // --- Кольцо: видно, только если ближайший цвет в открытой сейчас паре. ---
         final Runnable refreshMark = () -> {
             int[] n = lastNear[0];
@@ -537,7 +416,6 @@ final class ColorPicker {
             }
             table.setMark(near[2], near[3], near[4] == 1);
             tile.setTextColor(color);
-            refreshInfo.run();
         };
 
         // --- Привязка событий. ---
@@ -576,12 +454,6 @@ final class ColorPicker {
             bgSquares[i].setOnClickListener(v -> {
                 bgIndex[0] = bi;
                 drawReadability.run();
-                refreshInfo.run();
-            });
-            infoRows[i].setOnClickListener(v -> {
-                bgIndex[0] = bi;
-                drawReadability.run();
-                refreshInfo.run();
             });
         }
 
@@ -649,8 +521,8 @@ final class ColorPicker {
         box.addView(hexStatus, new LinearLayout.LayoutParams(-1, -2));
         box.addView(label(a, "Читаемость цифр на обоях"));
         box.addView(readRow, new LinearLayout.LayoutParams(-1, -2));
-        box.addView(hint(a, "Квадраты и строки справа — подложка под виджет."
-                + " Число — контраст цифр с фоном: чем больше, тем лучше читается."));
+        box.addView(hint(a, "Квадраты справа — подложка под виджет: чёрная, белая,"
+                + " цветная и пёстрая «фото»."));
         box.addView(groupLabel, new LinearLayout.LayoutParams(-1, -2));
         box.addView(chipsRow, new LinearLayout.LayoutParams(-1, -2));
         box.addView(label(a, "Стиль"));
