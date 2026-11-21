@@ -196,7 +196,8 @@ final class ColorPicker {
         hex.setTypeface(Typeface.DEFAULT_BOLD);
         hex.setGravity(Gravity.CENTER);
         hex.setBackground(null);
-        hex.setPadding(0, 0, 0, 0);
+        // Внутренние отступы = увеличенная зона тапа по всем сторонам.
+        hex.setPadding(dpPx(a, 14), dpPx(a, 10), dpPx(a, 14), dpPx(a, 10));
         hex.setHint("#35D9FF");
         hex.setText(toHex(initial));
         previewBox.addView(hex, new LinearLayout.LayoutParams(-2, -2));
@@ -211,7 +212,7 @@ final class ColorPicker {
         hexStatus.setTextColor(a.getColor(R.color.muted));
         hexStatus.setPadding(dpPx(a, 2), dpPx(a, 4), dpPx(a, 2), 0);
 
-        // --- 2. Читаемость: одна плитка размером с виджет и четыре подложки рядом. ---
+        // --- 2. Читаемость: плитка размером с виджет и четыре квадратные подложки. ---
         final TextView tile = new TextView(a);
         tile.setText("88");
         tile.setGravity(Gravity.CENTER);
@@ -228,9 +229,9 @@ final class ColorPicker {
             row.setOrientation(LinearLayout.HORIZONTAL);
             for (int c = 0; c < 2; c++) {
                 int idx = r * 2 + c;
-                View sq = new View(a);
+                View sq = new SquareView(a);
                 sq.setContentDescription(BG_DESC[idx]);
-                LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(0, dpPx(a, 48), 1f);
+                LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(0, -2, 1f);
                 slp.setMargins(dpPx(a, 3), dpPx(a, 3), dpPx(a, 3), dpPx(a, 3));
                 row.addView(sq, slp);
                 bgSquares[idx] = sq;
@@ -240,11 +241,11 @@ final class ColorPicker {
 
         LinearLayout readRow = new LinearLayout(a);
         readRow.setOrientation(LinearLayout.HORIZONTAL);
-        readRow.setGravity(Gravity.CENTER_VERTICAL);
+        readRow.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams(dpPx(a, 104), dpPx(a, 104));
         tileLp.setMargins(dpPx(a, 2), dpPx(a, 2), dpPx(a, 8), dpPx(a, 2));
         readRow.addView(tile, tileLp);
-        readRow.addView(rightBox, new LinearLayout.LayoutParams(0, -2, 1f));
+        readRow.addView(rightBox, new LinearLayout.LayoutParams(dpPx(a, 104), -2));
 
         // Цифры плитки подбираются измерением: «88» занимает 86% ширины,
         // те же пропорции, что на реальном виджете.
@@ -257,13 +258,13 @@ final class ColorPicker {
             }
         });
 
-        // --- 3. Семь цветных квадратов групп. ---
+        // --- 3. Семь квадратных цветных кнопок групп. ---
         LinearLayout chipsRow = new LinearLayout(a);
         chipsRow.setOrientation(LinearLayout.HORIZONTAL);
         View[] chips = new View[GROUP_NAMES.length];
         for (int i = 0; i < chips.length; i++) {
-            View chip = new View(a);
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, dpPx(a, 48), 1f);
+            View chip = new SquareView(a);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, -2, 1f);
             clp.setMargins(dpPx(a, 2), dpPx(a, 2), dpPx(a, 2), dpPx(a, 2));
             chipsRow.addView(chip, clp);
             chips[i] = chip;
@@ -284,10 +285,10 @@ final class ColorPicker {
             Button b = new Button(a);
             b.setText(STYLE_NAMES[i]);
             b.setAllCaps(false);
-            b.setTextSize(12);
+            b.setTextSize(13);
             b.setMinWidth(0);
             b.setMinimumWidth(0);
-            b.setPadding(0, 0, 0, 0);
+            b.setPadding(dpPx(a, 4), 0, dpPx(a, 4), 0);
             LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(0, dpPx(a, 44), 1f);
             blp.setMargins(dpPx(a, 2), dpPx(a, 2), dpPx(a, 2), dpPx(a, 2));
             stylesRow.addView(b, blp);
@@ -306,15 +307,26 @@ final class ColorPicker {
         table.setView(vg[0], vs[0]);
         table.setMark(near0[2], near0[3], near0[4] == 1);
 
-        // --- Прокрутка к строке текущего цвета. ---
+        // --- Прокрутка к строке текущего цвета: сначала возвращаем таблицу
+        //     к группе и стилю, где цвет живёт, потом едем к строке. ---
         final Runnable scrollToColor = () -> {
             int[] n = lastNear[0];
+            if (vg[0] != n[0] || vs[0] != n[1]) {
+                vg[0] = n[0];
+                vs[0] = n[1];
+                groupLabel.setText(GROUP_NAMES[vg[0]]);
+                drawChips[0].run();
+                drawStyles[0].run();
+                table.setView(vg[0], vs[0]);
+            }
+            table.setMark(n[2], n[3], n[4] == 1);
             int y = table.getTop() + n[3] * table.rowHeight() - scroll.getHeight() / 2;
             scroll.smoothScrollTo(0, Math.max(0, y));
         };
 
         // --- Перерисовка квадратов групп. ---
-        final Runnable drawChips = () -> {
+        final Runnable[] drawChips = new Runnable[1];
+        drawChips[0] = () -> {
             for (int i = 0; i < chips.length; i++) {
                 GradientDrawable shape = new GradientDrawable();
                 shape.setColor(Color.HSVToColor(new float[]{GROUP_HUES[i], 0.88f, 0.92f}));
@@ -328,14 +340,15 @@ final class ColorPicker {
         };
 
         // --- Перерисовка кнопок стилей. ---
-        final Runnable drawStyles = () -> {
+        final Runnable[] drawStyles = new Runnable[1];
+        drawStyles[0] = () -> {
             for (int i = 0; i < styleBtns.length; i++) {
                 boolean sel = i == vs[0];
                 Button b = styleBtns[i];
                 b.setTextColor(a.getColor(sel ? R.color.text : R.color.muted));
                 GradientDrawable bg = new GradientDrawable();
                 bg.setColor(a.getColor(R.color.button));
-                bg.setCornerRadius(dpPx(a, 8));
+                bg.setCornerRadius(dpPx(a, 10));
                 bg.setStroke(dpPx(a, sel ? 2 : 1),
                         sel ? a.getColor(R.color.accent) : a.getColor(R.color.stroke));
                 b.setBackground(bg);
@@ -397,8 +410,8 @@ final class ColorPicker {
                 vg[0] = near[0];
                 vs[0] = near[1];
                 groupLabel.setText(GROUP_NAMES[vg[0]]);
-                drawChips.run();
-                drawStyles.run();
+                drawChips[0].run();
+                drawStyles[0].run();
                 table.setView(vg[0], vs[0]);
             }
             table.setMark(near[2], near[3], near[4] == 1);
@@ -422,7 +435,7 @@ final class ColorPicker {
             chips[i].setOnClickListener(v -> {
                 vg[0] = gi;
                 groupLabel.setText(GROUP_NAMES[gi]);
-                drawChips.run();
+                drawChips[0].run();
                 table.setView(vg[0], vs[0]);
                 refreshMark.run();
             });
@@ -431,7 +444,7 @@ final class ColorPicker {
             final int si = i;
             styleBtns[i].setOnClickListener(v -> {
                 vs[0] = si;
-                drawStyles.run();
+                drawStyles[0].run();
                 table.setView(vg[0], vs[0]);
                 refreshMark.run();
             });
@@ -519,8 +532,8 @@ final class ColorPicker {
         box.addView(hint(a, "Нажми клетку — выбрать цвет. Кольцом отмечен выбранный"
                 + " (или ближайший к своему) цвет."));
 
-        drawChips.run();
-        drawStyles.run();
+        drawChips[0].run();
+        drawStyles[0].run();
         drawReadability.run();
         apply.run();
 
@@ -582,6 +595,19 @@ final class ColorPicker {
 
     private static int dpPx(Context c, float value) {
         return Math.round(value * c.getResources().getDisplayMetrics().density);
+    }
+
+    /** Квадратная кнопка: высота всегда равна ширине, как на эталонном скриншоте. */
+    private static final class SquareView extends View {
+        SquareView(Context c) {
+            super(c);
+        }
+
+        @Override
+        protected void onMeasure(int widthSpec, int heightSpec) {
+            int w = MeasureSpec.getSize(widthSpec);
+            setMeasuredDimension(w, w);
+        }
     }
 
     /** Вся таблица (7 столбцов × 30 строк) рисуется одним View, а не сотней клеток. */
