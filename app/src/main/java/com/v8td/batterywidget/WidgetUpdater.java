@@ -14,7 +14,6 @@ import java.util.HashMap;
 
 /** Единственная точка обновления всех экземпляров виджета. */
 final class WidgetUpdater {
-
     private static final HashMap<Integer, String> LAST = new HashMap<>();
     private static final int FALLBACK_DP = 56;
     private static final int MAX_PX = 512;
@@ -70,7 +69,6 @@ final class WidgetUpdater {
 
                     WidgetTextSizer.Size size = WidgetTextSizer.get(wh[0], wh[1], density, fontScale);
                     float textSize = state.percent == 100 ? size.threeDigits : size.twoDigits;
-
                     Bitmap bitmap = WidgetRenderer.render(wh[0], wh[1], state.percent, color, textSize);
 
                     RemoteViews views = new RemoteViews(app.getPackageName(), R.layout.widget_battery);
@@ -78,12 +76,10 @@ final class WidgetUpdater {
                     views.setContentDescription(R.id.widget_digits, "Заряд " + state.percent + "%");
                     views.setOnClickPendingIntent(R.id.widget_root, click);
                     manager.updateAppWidget(id, views);
-
                     LAST.put(id, signature);
                 } catch (Throwable ignored) {
                 }
             }
-
             Scheduler.ensure(app);
         } catch (Throwable ignored) {
         }
@@ -102,10 +98,8 @@ final class WidgetUpdater {
             }
         } catch (Throwable ignored) {
         }
-
         int wDp = pick(minW, maxW);
         int hDp = pick(minH, maxH);
-
         int w = Math.round(wDp * density);
         int h = Math.round(hDp * density);
         w = Math.max(24, Math.min(MAX_PX, w));
