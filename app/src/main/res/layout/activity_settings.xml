@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settings_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:id="@+id/settings_root"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:contentDescription="@string/app_name"
+                android:src="@drawable/ic_q88" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/app_name"
+                    android:textColor="@color/text"
+                    android:textSize="23sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/subtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/muted"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/status_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:lineSpacingExtra="3dp"
+            android:padding="14dp"
+            android:textColor="@color/text"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:id="@+id/config_box"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:lineSpacingExtra="3dp"
+                android:text="Виджет показывает заряд крупными цифрами на прозрачном фоне. Настройки открываются тапом по виджету или по значку Q-battery в списке приложений. Значок можно выключить в разделе «Системные настройки»."
+                android:textColor="@color/muted"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/btn_add"
+                style="@style/Btn"
+                android:text="Добавить виджет" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/settings_box"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView style="@style/Section" android:text="Цвет цифр" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_palette"
+                    style="@style/Btn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="Схема" />
+
+                <Button
+                    android:id="@+id/btn_bands"
+                    style="@style/Btn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center"
+                    android:text="Цвета схемы" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/palette_preview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal" />
+
+            <Switch
+                android:id="@+id/sw_charging_blue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:minHeight="44dp"
+                android:text="Синие цифры при зарядке"
+                android:textColor="@color/text"
+                android:textSize="15sp" />
+
+            <TextView style="@style/Section" android:text="Сигнал о зарядке" />
+
+            <Switch
+                android:id="@+id/sw_sound"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:minHeight="44dp"
+                android:text="Подать сигнал при зарядке"
+                android:textColor="@color/text"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/tv_threshold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/muted"
+                android:textSize="14sp" />
+
+            <SeekBar
+                android:id="@+id/seek_threshold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="50" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_sound_pick"
+                    style="@style/Btn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginTop="0dp"
+                    android:text="Выбор сигнала" />
+
+                <ImageButton
+                    android:id="@+id/btn_sound_test"
+                    android:layout_width="56dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_button"
+                    android:contentDescription="Проверить сигнал"
+                    android:padding="14dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_speaker" />
+            </LinearLayout>
+
+            <TextView style="@style/Section" android:text="Работа в фоне" />
+
+            <Button
+                android:id="@+id/btn_system"
+                style="@style/Btn"
+                android:text="Системные настройки" />
+
+            <LinearLayout
+                android:id="@+id/system_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="2dp"
+                    android:text="Приложение не может отключить системные ограничения само — оно только открывает нужный раздел. Значок в списке приложений включён: так система показывает Q-battery в списках батареи. Если значок не нужен — выключите его."
+                    android:textColor="@color/muted"
+                    android:textSize="13sp" />
+
+                <Switch
+                    android:id="@+id/sw_launcher_icon"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:minHeight="44dp"
+                    android:text="Показывать значок в списке приложений"
+                    android:textColor="@color/text"
+                    android:textSize="15sp" />
+
+                <Button android:id="@+id/btn_autostart" style="@style/Btn"
+                    android:text="Автозапуск" />
+                <Button android:id="@+id/btn_battery" style="@style/Btn"
+                    android:text="Экономия заряда" />
+                <Button android:id="@+id/btn_appinfo" style="@style/Btn"
+                    android:text="Системные настройки приложения" />
+            </LinearLayout>
+
+            <Button android:id="@+id/btn_help" style="@style/Btn"
+                android:text="Если виджет отстаёт — что проверить" />
+
+            <TextView style="@style/Section" android:text="О приложении" />
+
+            <Button android:id="@+id/btn_about" style="@style/Btn"
+                android:text="Информация и удаление" />
+            <Button android:id="@+id/btn_reset" style="@style/Btn"
+                android:text="Сбросить настройки" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="24dp" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
