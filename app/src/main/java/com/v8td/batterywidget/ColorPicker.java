@@ -307,23 +307,6 @@ final class ColorPicker {
         table.setView(vg[0], vs[0]);
         table.setMark(near0[2], near0[3], near0[4] == 1);
 
-        // --- Прокрутка к строке текущего цвета: сначала возвращаем таблицу
-        //     к группе и стилю, где цвет живёт, потом едем к строке. ---
-        final Runnable scrollToColor = () -> {
-            int[] n = lastNear[0];
-            if (vg[0] != n[0] || vs[0] != n[1]) {
-                vg[0] = n[0];
-                vs[0] = n[1];
-                groupLabel.setText(GROUP_NAMES[vg[0]]);
-                drawChips[0].run();
-                drawStyles[0].run();
-                table.setView(vg[0], vs[0]);
-            }
-            table.setMark(n[2], n[3], n[4] == 1);
-            int y = table.getTop() + n[3] * table.rowHeight() - scroll.getHeight() / 2;
-            scroll.smoothScrollTo(0, Math.max(0, y));
-        };
-
         // --- Перерисовка квадратов групп. ---
         final Runnable[] drawChips = new Runnable[1];
         drawChips[0] = () -> {
@@ -353,6 +336,23 @@ final class ColorPicker {
                         sel ? a.getColor(R.color.accent) : a.getColor(R.color.stroke));
                 b.setBackground(bg);
             }
+        };
+
+        // --- Прокрутка к строке текущего цвета: сначала возвращаем таблицу
+        //     к группе и стилю, где цвет живёт, потом едем к строке. ---
+        final Runnable scrollToColor = () -> {
+            int[] n = lastNear[0];
+            if (vg[0] != n[0] || vs[0] != n[1]) {
+                vg[0] = n[0];
+                vs[0] = n[1];
+                groupLabel.setText(GROUP_NAMES[vg[0]]);
+                drawChips[0].run();
+                drawStyles[0].run();
+                table.setView(vg[0], vs[0]);
+            }
+            table.setMark(n[2], n[3], n[4] == 1);
+            int y = table.getTop() + n[3] * table.rowHeight() - scroll.getHeight() / 2;
+            scroll.smoothScrollTo(0, Math.max(0, y));
         };
 
         // --- Плитка-виджет и квадраты подложек. ---
