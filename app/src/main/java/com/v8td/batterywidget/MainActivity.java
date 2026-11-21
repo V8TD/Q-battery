@@ -472,7 +472,6 @@ public final class MainActivity extends Activity {
         final int[] drumTick = {0};
         final int[] lightShift = {0};
         final int[][] drumFinal = {null};
-        Button prevBtn = null;
         if (pal == Prefs.userPaletteIndex()) {
             LinearLayout chaosBox = new LinearLayout(this);
             chaosBox.setOrientation(LinearLayout.VERTICAL);
@@ -500,7 +499,7 @@ public final class MainActivity extends Activity {
             btns.setOrientation(LinearLayout.HORIZONTAL);
             btns.setPadding(0, dp(8), 0, 0);
             Button chaosBtn = chaosButton("Хаос");
-            prevBtn = chaosButton("Вернуть предыдущий");
+            final Button prevBtn = chaosButton("Вернуть предыдущий");
             prevBtn.setEnabled(Prefs.hasChaosSnapshot(this));
             prevBtn.setAlpha(prevBtn.isEnabled() ? 1f : 0.45f);
             btns.addView(chaosBtn, new LinearLayout.LayoutParams(0, dp(44), 1f));
