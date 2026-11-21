@@ -50,6 +50,11 @@ final class WidgetUpdater {
                     ? Prefs.CHARGING_COLOR
                     : Prefs.color(app, BatteryState.band(state.percent));
             int revision = Prefs.revision();
+            boolean full = Prefs.fullChaos(app)
+                    && Prefs.palette(app) == Prefs.userPaletteIndex();
+            // В фулл-хаосе разрешаем перекраску не чаще раза в 30 секунд:
+            // никаких лишних обновлений, только штатный ритм.
+            long tick = full ? System.currentTimeMillis() / 30000L : 0L;
             DisplayMetrics metrics = app.getResources().getDisplayMetrics();
             float density = metrics.density > 0 ? metrics.density : 1f;
             float fontScale = app.getResources().getConfiguration().fontScale;
@@ -60,12 +65,14 @@ final class WidgetUpdater {
                 try {
                     int[] wh = geometry(app, manager, id, density);
                     String signature = state.percent + "|" + state.charging + "|" + color
-                            + "|" + revision + "|" + wh[0] + "x" + wh[1];
+                            + "|" + revision + "|" + (full ? 1 : 0) + "|" + tick
+                            + "|" + wh[0] + "x" + wh[1];
                     if (!force && signature.equals(LAST.get(id))) continue;
 
                     WidgetTextSizer.Size size = WidgetTextSizer.get(wh[0], wh[1], density, fontScale);
                     float textSize = state.percent == 100 ? size.threeDigits : size.twoDigits;
-                    Bitmap bitmap = WidgetRenderer.render(wh[0], wh[1], state.percent, color, textSize);
+                    Bitmap bitmap = WidgetRenderer.render(wh[0], wh[1], state.percent, color,
+                            textSize, full);
 
                     RemoteViews views = new RemoteViews(app.getPackageName(), R.layout.widget_battery);
                     views.setImageViewBitmap(R.id.widget_digits, bitmap);
