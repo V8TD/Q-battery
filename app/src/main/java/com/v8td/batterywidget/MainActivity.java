@@ -760,13 +760,13 @@ public final class MainActivity extends Activity {
                 .show();
     }
 
-    private void showAbout() {
+        private void showAbout() {
         new AlertDialog.Builder(this)
                 .setTitle("Q-battery " + BuildConfig.VERSION_NAME)
                 .setMessage("Виджет заряда 1×1. Прозрачный фон, крупные цифры, одинаковый размер "
                         + "для всех значений 0–99 и отдельный для 100.\n\n"
                         + "У Арлекина есть хаос: случайный набор цветов, бегущие огни в настройках "
-                        + и фулл-хаос, когда каждая цифра своего цвета.\n\n"
+                        + "и фулл-хаос, когда каждая цифра своего цвета.\n\n"
                         + "Без интернета, без рекламы, без постоянного уведомления.\n\n"
                         + "Удаление: Настройки Android → Приложения → Q-battery → Удалить.")
                 .setPositiveButton("Настройки приложения", (d, w) -> SystemLinks.openAppDetails(this))
