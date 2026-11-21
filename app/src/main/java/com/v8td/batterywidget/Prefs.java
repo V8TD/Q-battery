@@ -125,6 +125,55 @@ final class Prefs {
         bump();
     }
 
+    /** Фулл хаос: каждая цифра своим случайным цветом. По умолчанию выключен. */
+    static boolean fullChaos(Context c) {
+        return get(c).getBoolean("full_chaos", false);
+    }
+
+    static void setFullChaos(Context c, boolean v) {
+        putBoolean(get(c), "full_chaos", v);
+        bump();
+    }
+
+    /** Бегущие огни превью-полоски в окне Арлекина. По умолчанию выключены. */
+    static boolean runningLights(Context c) {
+        return get(c).getBoolean("running_lights", false);
+    }
+
+    static void setRunningLights(Context c, boolean v) {
+        putBoolean(get(c), "running_lights", v);
+    }
+
+    /** Есть ли снимок цветов Арлекина до последнего «Хаоса» (один шаг назад). */
+    static boolean hasChaosSnapshot(Context c) {
+        return get(c).getBoolean("chaos_has_prev", false);
+    }
+
+    /** Запоминает текущие цвета Арлекина как «предыдущие». */
+    static void saveChaosSnapshot(Context c) {
+        SharedPreferences p = get(c);
+        SharedPreferences.Editor e = p.edit();
+        int har = userPaletteIndex();
+        for (int b = 0; b < BANDS; b++) {
+            e.putInt("chaos_prev_" + b, p.getInt(key(har, b), factory(har, b)));
+        }
+        e.putBoolean("chaos_has_prev", true);
+        e.apply();
+    }
+
+    /** Возвращает Арлекину цвета из снимка. */
+    static void restoreChaosSnapshot(Context c) {
+        SharedPreferences p = get(c);
+        if (!p.getBoolean("chaos_has_prev", false)) return;
+        int har = userPaletteIndex();
+        SharedPreferences.Editor e = p.edit();
+        for (int b = 0; b < BANDS; b++) {
+            e.putInt(key(har, b), p.getInt("chaos_prev_" + b, factory(har, b)));
+        }
+        e.apply();
+        bump();
+    }
+
     /** Отличается ли схема от заводского состояния. */
     static boolean isModified(Context c, int paletteIndex) {
         int pal = clampPalette(paletteIndex);
